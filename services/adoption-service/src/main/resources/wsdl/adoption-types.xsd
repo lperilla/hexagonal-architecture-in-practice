@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Contrato SOAP de adopción (contract first). Las clases JAXB se generan a partir
+  de este esquema. Los cambios deben ser compatibles hacia atrás: solo se añaden
+  elementos opcionales u operaciones nuevas.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="http://example.com/petstore/adoption"
+           targetNamespace="http://example.com/petstore/adoption"
+           elementFormDefault="qualified">
+
+    <!-- Petición: adoptar una mascota a nombre de su nuevo dueño -->
+    <xs:element name="AdoptPetRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="petId" type="xs:string"/>
+                <xs:element name="ownerName" type="tns:OwnerName"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Respuesta: la mascota ya adoptada -->
+    <xs:element name="AdoptPetResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="petId" type="xs:string"/>
+                <xs:element name="petName" type="xs:string"/>
+                <xs:element name="status" type="tns:PetStatus"/>
+                <xs:element name="ownerName" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Detalle del fault PetNotFound: la mascota no existe -->
+    <xs:element name="PetNotFoundFault" type="tns:AdoptionFault"/>
+
+    <!-- Detalle del fault PetNotAvailable: la mascota no está disponible -->
+    <xs:element name="PetNotAvailableFault" type="tns:AdoptionFault"/>
+
+    <xs:complexType name="AdoptionFault">
+        <xs:sequence>
+            <xs:element name="petId" type="xs:string"/>
+            <xs:element name="message" type="xs:string"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Nombre del dueño: no puede estar vacío ni contener solo espacios -->
+    <xs:simpleType name="OwnerName">
+        <xs:restriction base="xs:string">
+            <xs:minLength value="1"/>
+            <xs:maxLength value="100"/>
+            <xs:pattern value=".*\S.*"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="PetStatus">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="AVAILABLE"/>
+            <xs:enumeration value="ADOPTED"/>
+        </xs:restriction>
+    </xs:simpleType>
+</xs:schema>

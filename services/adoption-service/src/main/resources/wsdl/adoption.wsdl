@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Servicio SOAP de adopción (contract first): WSDL 1.1, document/literal, SOAP 1.1.
+  Los tipos se importan de adoption-types.xsd, que se publica junto al WSDL en /ws/adoption-types.xsd.
+-->
+<wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+                  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                  xmlns:tns="http://example.com/petstore/adoption"
+                  targetNamespace="http://example.com/petstore/adoption"
+                  name="AdoptionService">
+
+    <wsdl:types>
+        <xs:schema>
+            <xs:import namespace="http://example.com/petstore/adoption" schemaLocation="adoption-types.xsd"/>
+        </xs:schema>
+    </wsdl:types>
+
+    <wsdl:message name="AdoptPetRequest">
+        <wsdl:part name="parameters" element="tns:AdoptPetRequest"/>
+    </wsdl:message>
+    <wsdl:message name="AdoptPetResponse">
+        <wsdl:part name="parameters" element="tns:AdoptPetResponse"/>
+    </wsdl:message>
+    <wsdl:message name="PetNotFoundFault">
+        <wsdl:part name="fault" element="tns:PetNotFoundFault"/>
+    </wsdl:message>
+    <wsdl:message name="PetNotAvailableFault">
+        <wsdl:part name="fault" element="tns:PetNotAvailableFault"/>
+    </wsdl:message>
+
+    <wsdl:portType name="AdoptionPort">
+        <wsdl:operation name="AdoptPet">
+            <wsdl:documentation>
+                Adopta una mascota a nombre de su nuevo dueño. Solo se puede adoptar una mascota disponible.
+            </wsdl:documentation>
+            <wsdl:input message="tns:AdoptPetRequest"/>
+            <wsdl:output message="tns:AdoptPetResponse"/>
+            <wsdl:fault name="PetNotFound" message="tns:PetNotFoundFault"/>
+            <wsdl:fault name="PetNotAvailable" message="tns:PetNotAvailableFault"/>
+        </wsdl:operation>
+    </wsdl:portType>
+
+    <wsdl:binding name="AdoptionSoap11Binding" type="tns:AdoptionPort">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <wsdl:operation name="AdoptPet">
+            <soap:operation soapAction=""/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+            <wsdl:fault name="PetNotFound">
+                <soap:fault name="PetNotFound" use="literal"/>
+            </wsdl:fault>
+            <wsdl:fault name="PetNotAvailable">
+                <soap:fault name="PetNotAvailable" use="literal"/>
+            </wsdl:fault>
+        </wsdl:operation>
+    </wsdl:binding>
+
+    <wsdl:service name="AdoptionService">
+        <wsdl:port name="AdoptionSoap11Port" binding="tns:AdoptionSoap11Binding">
+            <soap:address location="http://localhost:8080/ws"/>
+        </wsdl:port>
+    </wsdl:service>
+</wsdl:definitions>

@@ -1,0 +1,154 @@
+openapi: 3.0.3
+info:
+  title: Adoption API
+  description: |
+    API de adopción de mascotas de la tienda.
+
+    Regla de negocio: una mascota solo puede adoptarse si está disponible.
+    Al adoptarla, queda asociada a su nuevo dueño.
+
+    Contrato API first: este documento es la fuente de verdad. El código
+    (interfaces y DTOs) se genera a partir de él. Los cambios deben ser
+    compatibles hacia atrás: solo se añaden campos u operaciones.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Adoption
+    description: Adopción de mascotas
+
+paths:
+  /pets/{petId}/adoption:
+    post:
+      tags:
+        - Adoption
+      operationId: adoptPet
+      summary: Adopta una mascota
+      description: |
+        Adopta la mascota indicada a nombre de su nuevo dueño. Si la adopción
+        se completa, se publica el evento `pet.adopted`.
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          description: Identificador de la mascota
+          schema:
+            type: string
+          example: "1"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdoptionRequest'
+            example:
+              ownerName: Ana
+      responses:
+        '200':
+          description: Mascota adoptada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdoptionResponse'
+              example:
+                petId: "1"
+                petName: Luna
+                status: ADOPTED
+                ownerName: Ana
+        '400':
+          description: Petición no válida (por ejemplo, nombre del dueño vacío)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                detail: Invalid request content.
+                instance: /pets/1/adoption
+        '404':
+          description: La mascota no existe
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Not Found
+                status: 404
+                detail: La mascota 99 no existe
+                instance: /pets/99/adoption
+        '409':
+          description: La mascota no está disponible para adopción
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                type: about:blank
+                title: Conflict
+                status: 409
+                detail: La mascota 1 no está disponible para adopción
+                instance: /pets/1/adoption
+
+components:
+  schemas:
+    AdoptionRequest:
+      type: object
+      required:
+        - ownerName
+      properties:
+        ownerName:
+          type: string
+          description: Nombre del nuevo dueño. No puede estar vacío ni contener solo espacios.
+          minLength: 1
+          maxLength: 100
+          pattern: '.*\S.*'
+          example: Ana
+
+    AdoptionResponse:
+      type: object
+      required:
+        - petId
+        - petName
+        - status
+        - ownerName
+      properties:
+        petId:
+          type: string
+          example: "1"
+        petName:
+          type: string
+          example: Luna
+        status:
+          $ref: '#/components/schemas/PetStatus'
+        ownerName:
+          type: string
+          example: Ana
+
+    PetStatus:
+      type: string
+      description: Estado de la mascota
+      enum:
+        - AVAILABLE
+        - ADOPTED
+
+    Problem:
+      type: object
+      description: Error con el formato de RFC 9457 (Problem Details for HTTP APIs)
+      properties:
+        type:
+          type: string
+          format: uri
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri

@@ -1,0 +1,58 @@
+{
+  "event": "pet.adopted",
+  "description": "Se publica cuando una mascota disponible ha sido adoptada y ha quedado asociada a su nuevo dueño.",
+  "producer": "adoption-service",
+  "transport": {
+    "broker": "RabbitMQ",
+    "exchange": "petstore.events",
+    "exchangeType": "topic",
+    "durable": true,
+    "routingKey": "pet.adopted",
+    "contentType": "application/json",
+    "deliveryMode": "persistent"
+  },
+  "consumers": [
+    {
+      "service": "notification-service",
+      "queue": "notification.pet-adopted",
+      "deadLetterQueue": "notification.pet-adopted.dlq",
+      "since": "fase 2"
+    },
+    {
+      "service": "pet-registry-service",
+      "queue": "pet-registry.pet-adopted",
+      "deadLetterQueue": "pet-registry.pet-adopted.dlq",
+      "since": "fase 3"
+    }
+  ],
+  "payload": {
+    "petId": {
+      "type": "string",
+      "required": true,
+      "description": "Identificador de la mascota adoptada"
+    },
+    "petName": {
+      "type": "string",
+      "required": true,
+      "description": "Nombre de la mascota"
+    },
+    "ownerName": {
+      "type": "string",
+      "required": true,
+      "description": "Nombre del nuevo dueño"
+    },
+    "adoptedAt": {
+      "type": "string",
+      "format": "date-time",
+      "required": true,
+      "description": "Instante de la adopción en UTC, en formato ISO 8601"
+    }
+  },
+  "compatibility": "Solo se añaden campos, nunca se renombran ni se eliminan. Los consumidores deben ignorar los campos que no conocen y no depender de los nombres de clase del productor (sin cabecera __TypeId__). Desde la fase 4 se añade adopterId.",
+  "example": {
+    "petId": "1",
+    "petName": "Luna",
+    "ownerName": "Ana",
+    "adoptedAt": "2026-12-04T10:15:30Z"
+  }
+}

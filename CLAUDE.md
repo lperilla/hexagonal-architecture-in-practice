@@ -139,7 +139,7 @@ services/adoption-service/
 └── src/main/
     ├── resources/
     │   ├── openapi/adoption-api.yaml       Contrato REST (se genera en target/generated-sources)
-    │   ├── wsdl/adoption.wsdl, adoption.xsd Contrato SOAP (se genera en target/generated-sources)
+    │   ├── wsdl/adoption.wsdl, adoption-types.xsd  Contrato SOAP (se genera en target/generated-sources)
     │   └── application.yml
     └── java/com/example/petstore/adoption/
         ├── AdoptionServiceApplication.java
@@ -189,7 +189,7 @@ services/adoption-service/
 | `infrastructure` | `infrastructure.mongodb`, `infrastructure.rabbitmq`, `infrastructure.inmemory`, `infrastructure.client` | `MongoPetAdapter`, `PetDocument`, `PetMongoMapper`, `SpringDataPetRepository`; `RabbitPetAdoptedPublisher`, `PetAdoptedMessage`, configuración de exchange; `InMemoryPetAdapter` |
 | `api-contract` | Generados desde `openapi/adoption-api.yaml` | Interfaz de la API y DTOs de petición y respuesta |
 | `api-rest` | `api.rest` | Controlador que implementa la interfaz generada, mapper DTO a comando, manejador de errores (`ProblemDetail`) |
-| `soap-contract` | Generados desde `adoption.xsd` | Clases JAXB de petición, respuesta y faults |
+| `soap-contract` | Generados desde `adoption-types.xsd` | Clases JAXB de petición, respuesta y faults |
 | `api-soap` | `api.soap` | Endpoint, mapper y traducción de excepciones de dominio a faults SOAP |
 | `boot` | `boot`, `boot.config` | `AdoptionServiceApplication`, registro de `AdoptPetService` como bean, `application.yml`, perfil `in-memory`, datos de demo, ArchUnit y tests de arranque |
 
