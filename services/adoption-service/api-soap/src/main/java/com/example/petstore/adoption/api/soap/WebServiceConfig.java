@@ -1,4 +1,4 @@
-package com.example.petstore.adoption.config;
+package com.example.petstore.adoption.api.soap;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

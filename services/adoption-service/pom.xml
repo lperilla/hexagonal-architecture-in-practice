@@ -20,10 +20,12 @@
     <!-- Las dependencias entre módulos las impone Maven: el núcleo no puede ver la tecnología -->
     <modules>
         <module>api-contract</module>
+        <module>soap-contract</module>
         <module>domain</module>
         <module>application</module>
         <module>infrastructure</module>
         <module>api-rest</module>
+        <module>api-soap</module>
         <module>boot</module>
     </modules>
 </project>
