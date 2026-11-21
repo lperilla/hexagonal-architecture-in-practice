@@ -1,0 +1,35 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: notification-service
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: petstore
+    password: petstore
+    listener:
+      simple:
+        # Tras agotar los reintentos, el mensaje va a la cola de mensajes fallidos (DLQ)
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 500ms
+
+  # Mailpit: los emails se ven en http://localhost:8025
+  mail:
+    host: localhost
+    port: 1025
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+notification:
+  shelter-email: refugio@petstore.example
+  from-email: notificaciones@petstore.example
