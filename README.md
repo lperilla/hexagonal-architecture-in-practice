@@ -79,25 +79,43 @@ podman compose down       # parar (añade -v para borrar los datos de MongoDB)
 
 En PowerShell, sustituye `./mvnw` por `.\mvnw.cmd`.
 
-Los tests de extremo a extremo (`AdoptionEndToEndTest`) usan la infraestructura de `compose.yaml`: levántala antes con `podman compose up -d`. Usan su propia base de datos, `petstore-adoption-test`, y no tocan los datos de la demo.
+Los tests de extremo a extremo (`AdoptionEndToEndTest` y `NotificationEndToEndTest`) usan la infraestructura de `compose.yaml`: levántala antes con `podman compose up -d`.
+- El de adopción usa su propia base de datos, `petstore-adoption-test`, y no toca los datos de la demo.
+- El de notificaciones publica eventos en RabbitMQ y comprueba los emails en la API de Mailpit. Cada test usa una mascota con un nombre único, así que no borra los emails que haya. No lo ejecutes con `notification-service` arrancado: los dos consumirían de la misma cola.
+
+## Servicios
+
+| Servicio | Puerto | Qué hace |
+|---|---|---|
+| `adoption-service` | 8080 | Adopción por REST y SOAP. Publica `pet.adopted` |
+| `notification-service` | 8083 | Escucha `pet.adopted` y envía un email al refugio («Ana ha adoptado a Luna»). Solo publica `/actuator/health` |
+
+`notification-service`:
+- **Cola:** `notification.pet-adopted`, enlazada al exchange `petstore.events` con la routing key `pet.adopted`.
+- **Reintentos:** un mensaje que no se puede procesar se reintenta 3 veces y después va a `notification.pet-adopted.dlq`.
+- **Idempotencia:** el mismo evento recibido dos veces solo genera un email. La clave es `petId` + `adoptedAt`, y el registro está en memoria.
+- **Perfil `log-notifications`:** escribe la notificación en el log en lugar de enviarla.
+- **Configuración:** la dirección del refugio está en `notification.shelter-email`, en `application.yml`.
 
 ## Demo
 
-Arranca la infraestructura y el servicio de adopción:
+Arranca la infraestructura y los servicios:
 
 ```bash
 podman compose up -d
-./mvnw -pl services/adoption-service -am -DskipTests package
+./mvnw -DskipTests package
 java -jar services/adoption-service/target/adoption-service-0.0.1-SNAPSHOT.jar
+java -jar services/notification-service/target/notification-service-0.0.1-SNAPSHOT.jar
 ```
 
-Al arrancar, el servicio carga tres mascotas disponibles si no existen: 1 Luna, 2 Thor y 3 Kira.
+Al arrancar, el servicio de adopción carga tres mascotas disponibles si no existen: 1 Luna, 2 Thor y 3 Kira.
 
 | Canal | Dónde | Casos |
 |---|---|---|
 | REST | `requests.http` (REST Client de VS Code o IntelliJ) | 200, 409, 404 y 400 en `POST /pets/{petId}/adoption` |
 | SOAP | `soap-requests/` | Adopción, `PetNotAvailable`, `PetNotFound` y nombre vacío. WSDL en http://localhost:8080/ws/adoption.wsdl |
-| Evento | Consola de RabbitMQ | Cada adopción publica `pet.adopted` en el exchange `petstore.events` (contrato en `contracts/events/`) |
+| Evento | Consola de RabbitMQ (http://localhost:15672) | Cada adopción publica `pet.adopted` en el exchange `petstore.events` (contrato en `contracts/events/`) |
+| Email | Mailpit (http://localhost:8025) | Cada adopción genera un email al refugio: «Ana ha adoptado a Luna» |
 
 Para volver al estado inicial, borra la base de datos y reinicia el servicio:
 
@@ -117,6 +135,7 @@ hexagonal-architecture-in-practice/
 ├── soap-requests/   Sobres SOAP de la demo
 ├── contracts/       Contratos de los eventos de RabbitMQ
 ├── services/        Un servicio por carpeta
-│   └── adoption-service/
+│   ├── adoption-service/
+│   └── notification-service/
 └── docs/            Presentación, guía de teoría y cartel
 ```
