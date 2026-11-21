@@ -1,0 +1,84 @@
+# Arquitectura hexagonal en la práctica: del diseño al código
+
+Código y material de la charla técnica **"Arquitectura hexagonal en la práctica: del diseño al código"** (4 de diciembre de 2026).
+
+El caso central es **adoptar una mascota**: un servicio que se migra paso a paso desde un proyecto MVC en capas hasta una arquitectura hexagonal multimódulo, sin cambiar su comportamiento. Alrededor de él se construye un pequeño ecosistema de microservicios de una tienda de mascotas.
+
+La charla se organiza en tres bloques:
+
+1. Puertos y adaptadores
+2. Buenas y malas prácticas
+3. Ventajas y decisiones de diseño
+
+## Stack
+
+Java 25 · Spring Boot 4.1.2 · Maven multimódulo · Lombok · MongoDB · RabbitMQ · REST (API first, OpenAPI) · SOAP (contract first, Spring Web Services) · Mailpit · JUnit 6, Mockito, AssertJ, Testcontainers y ArchUnit · Podman.
+
+## Requisitos
+
+| Herramienta | Versión | Comprobación |
+|---|---|---|
+| JDK | 25 | `java -version` (y `JAVA_HOME` apuntando a ese JDK) |
+| Podman | 6.x, con `podman compose` | `podman --version` y `podman compose version` |
+| Git | cualquiera reciente | `git --version` |
+
+No hace falta instalar Maven: el repositorio incluye el Maven Wrapper (`./mvnw` en bash y `.\mvnw.cmd` en PowerShell), que descarga Maven 3.9.16.
+
+La construcción falla con un mensaje claro si no se usa Java 25.
+
+### Podman en Windows
+
+- La máquina de Podman tiene que estar en marcha: `podman machine start`.
+- **WSL 2.7.5 o superior.** Podman 6 usa nftables para la red de los contenedores, y el kernel de versiones anteriores de WSL no incluye los módulos necesarios (`nft_fib`). Con un WSL antiguo, los contenedores no arrancan y aparece `netavark (exit code 1): nftables error`. Comprueba la versión con `wsl --version` y actualiza con `wsl --update`.
+- **Podman 6.1.1 o superior dentro de la máquina.** Con Podman 6.0.x, los puertos publicados no llegan a `localhost` en Windows: los contenedores arrancan, pero no se puede acceder a ellos desde fuera de la máquina. La versión de la máquina puede ser distinta de la del cliente. Compruébala con `podman version`, en el campo `Server`.
+- Testcontainers usa la tubería `\\.\pipe\docker_engine` que crea Podman al arrancar la máquina, sin necesidad de definir `DOCKER_HOST`. Si al arrancar la máquina aparece `win-sshproxy.exe failed to start`, suele deberse a un socket huérfano en `%TEMP%\podman`: para la máquina, renombra esa carpeta y vuelve a arrancarla.
+- En redes corporativas con proxy TLS (por ejemplo, Zscaler), el certificado raíz corporativo debe instalarse **dentro** de la máquina de Podman, no solo en Windows.
+
+### Maven y mirrors corporativos
+
+`.mvn/settings.xml` es un `settings.xml` vacío: descarga todo de Maven Central. Si tu `~/.m2/settings.xml` redirige las descargas a un mirror corporativo que no está accesible, usa el del proyecto:
+
+```bash
+./mvnw -s .mvn/settings.xml verify
+```
+
+## Infraestructura
+
+`compose.yaml` levanta MongoDB, RabbitMQ y Mailpit:
+
+```bash
+podman compose up -d      # arrancar
+podman compose ps         # estado
+podman compose down       # parar (añade -v para borrar los datos de MongoDB)
+```
+
+| Servicio | Puerto | Acceso |
+|---|---|---|
+| MongoDB | 27017 | `mongodb://localhost:27017` |
+| RabbitMQ (AMQP) | 5672 | usuario `petstore`, contraseña `petstore` |
+| RabbitMQ (consola) | 15672 | http://localhost:15672 |
+| Mailpit (SMTP) | 1025 | |
+| Mailpit (web) | 8025 | http://localhost:8025 |
+
+## Construcción
+
+```bash
+./mvnw verify                                        # todo el monorepo
+./mvnw -pl services/adoption-service -am verify      # un solo servicio
+```
+
+En PowerShell, sustituye `./mvnw` por `.\mvnw.cmd`.
+
+Los tests con Testcontainers necesitan la máquina de Podman en marcha.
+
+## Organización
+
+```text
+hexagonal-architecture-in-practice/
+├── pom.xml          POM agregador: Spring Boot 4.1.2, Java 25 y versiones de plugins
+├── mvnw, mvnw.cmd   Maven Wrapper
+├── .mvn/            Configuración del wrapper y settings.xml del proyecto
+├── compose.yaml     Infraestructura (Podman)
+├── services/        Un servicio por carpeta
+└── docs/            Presentación, guía de teoría y cartel
+```

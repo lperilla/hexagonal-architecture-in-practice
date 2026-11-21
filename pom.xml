@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Todos los servicios comparten la gestión de versiones de Spring Boot -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.2</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example.petstore</groupId>
+    <artifactId>hexagonal-architecture-in-practice</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>hexagonal-architecture-in-practice</name>
+    <description>Arquitectura hexagonal en la práctica: del diseño al código</description>
+
+    <modules>
+        <!-- Un módulo por servicio, en services/ -->
+    </modules>
+
+    <properties>
+        <java.version>25</java.version>
+
+        <!-- Versiones que Spring Boot no gestiona -->
+        <archunit.version>1.5.1</archunit.version>
+        <openapi-generator.version>7.27.0</openapi-generator.version>
+        <jaxb2-maven-plugin.version>4.3.0</jaxb2-maven-plugin.version>
+    </properties>
+
+    <!-- Sin dependencias: cada módulo declara solo lo que usa -->
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Desde Java 23 el procesamiento de anotaciones no se activa solo: Lombok se declara explícitamente -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+
+                <!-- API first: interfaces y DTOs generados desde el contrato OpenAPI -->
+                <plugin>
+                    <groupId>org.openapitools</groupId>
+                    <artifactId>openapi-generator-maven-plugin</artifactId>
+                    <version>${openapi-generator.version}</version>
+                    <configuration>
+                        <generatorName>spring</generatorName>
+                        <library>spring-boot</library>
+                        <generateApiDocumentation>false</generateApiDocumentation>
+                        <generateModelDocumentation>false</generateModelDocumentation>
+                        <generateApiTests>false</generateApiTests>
+                        <generateModelTests>false</generateModelTests>
+                        <generateSupportingFiles>false</generateSupportingFiles>
+                        <configOptions>
+                            <useSpringBoot4>true</useSpringBoot4>
+                            <useJackson3>true</useJackson3>
+                            <interfaceOnly>true</interfaceOnly>
+                            <skipDefaultInterface>true</skipDefaultInterface>
+                            <useTags>true</useTags>
+                            <useBeanValidation>true</useBeanValidation>
+                            <useResponseEntity>true</useResponseEntity>
+                            <openApiNullable>false</openApiNullable>
+                            <documentationProvider>none</documentationProvider>
+                            <annotationLibrary>none</annotationLibrary>
+                        </configOptions>
+                    </configuration>
+                </plugin>
+
+                <!-- Contract first: clases JAXB (Jakarta) generadas desde el XSD -->
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>jaxb2-maven-plugin</artifactId>
+                    <version>${jaxb2-maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <plugins>
+            <!-- Falla pronto y con un mensaje claro si no se usa Java 25 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-versions</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[25,)</version>
+                                    <message>Este proyecto necesita Java 25. Revisa JAVA_HOME.</message>
+                                </requireJavaVersion>
+                                <requireMavenVersion>
+                                    <version>[3.9,)</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

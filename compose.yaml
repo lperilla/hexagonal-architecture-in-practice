@@ -1,0 +1,51 @@
+# Infraestructura de la tienda de mascotas.
+# Arranque: podman compose up -d
+# Parada:   podman compose down      (añade -v para borrar los datos)
+
+name: petstore
+
+services:
+  mongodb:
+    image: docker.io/library/mongo:8.0
+    container_name: petstore-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: docker.io/library/rabbitmq:4-management
+    container_name: petstore-rabbitmq
+    environment:
+      # El usuario guest solo puede conectarse desde localhost dentro del
+      # contenedor, así que se crea un usuario propio para la demo.
+      RABBITMQ_DEFAULT_USER: petstore
+      RABBITMQ_DEFAULT_PASS: petstore
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Consola de gestión: http://localhost:15672
+    healthcheck:
+      # Comprobación TCP: rabbitmq-diagnostics se ejecutaría como root y crearía
+      # una cookie de Erlang que el servidor (usuario rabbitmq) no puede leer.
+      test: ["CMD", "bash", "-c", "</dev/tcp/localhost/5672"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: docker.io/axllent/mailpit:latest
+    container_name: petstore-mailpit
+    ports:
+      - "1025:1025"     # SMTP
+      - "8025:8025"     # Web: http://localhost:8025
+
+volumes:
+  mongodb-data:
+  rabbitmq-data:
