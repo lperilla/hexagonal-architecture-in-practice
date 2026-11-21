@@ -17,6 +17,13 @@
     <description>Adopción de mascotas: REST, SOAP, MongoDB y RabbitMQ</description>
 
     <dependencies>
+        <!-- Migración: el proyecto en capas empieza a usar el puerto de entrada -->
+        <dependency>
+            <groupId>com.example.petstore.adoption</groupId>
+            <artifactId>application</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>

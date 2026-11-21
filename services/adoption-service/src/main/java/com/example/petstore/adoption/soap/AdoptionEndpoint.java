@@ -1,7 +1,10 @@
 package com.example.petstore.adoption.soap;
 
-import com.example.petstore.adoption.model.PetDocument;
-import com.example.petstore.adoption.service.PetService;
+import com.example.petstore.adoption.application.port.in.AdoptPetCommand;
+import com.example.petstore.adoption.application.port.in.AdoptPetUseCase;
+import com.example.petstore.adoption.application.port.in.AdoptionResult;
+import com.example.petstore.adoption.domain.model.Owner;
+import com.example.petstore.adoption.domain.model.PetId;
 import com.example.petstore.adoption.soap.contract.AdoptPetRequest;
 import com.example.petstore.adoption.soap.contract.AdoptPetResponse;
 import com.example.petstore.adoption.soap.contract.PetStatus;
@@ -19,19 +22,20 @@ public class AdoptionEndpoint {
 
     public static final String NAMESPACE = "http://example.com/petstore/adoption";
 
-    private final PetService petService;
+    private final AdoptPetUseCase adoptPetUseCase;
 
     @PayloadRoot(namespace = NAMESPACE, localPart = "AdoptPetRequest")
     @ResponsePayload
     public AdoptPetResponse adoptPet(@RequestPayload AdoptPetRequest request) {
         try {
-            PetDocument pet = petService.adopt(request.getPetId(), request.getOwnerName());
+            AdoptionResult result = adoptPetUseCase.adopt(
+                    new AdoptPetCommand(new PetId(request.getPetId()), new Owner(request.getOwnerName())));
 
             AdoptPetResponse response = new AdoptPetResponse();
-            response.setPetId(pet.getId());
-            response.setPetName(pet.getName());
-            response.setStatus(PetStatus.fromValue(pet.getStatus()));
-            response.setOwnerName(pet.getOwnerName());
+            response.setPetId(result.petId().value());
+            response.setPetName(result.petName());
+            response.setStatus(PetStatus.fromValue(result.status().name()));
+            response.setOwnerName(result.owner().name());
             return response;
         } catch (ResponseStatusException e) {
             // El servicio solo sabe responder con códigos HTTP: hay que traducirlos a faults SOAP

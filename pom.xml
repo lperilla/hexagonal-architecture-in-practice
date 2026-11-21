@@ -23,6 +23,7 @@
     <modules>
         <!-- Migración en curso: los módulos hexagonales crecen junto al proyecto en capas -->
         <module>services/adoption-service/domain</module>
+        <module>services/adoption-service/application</module>
         <module>services/adoption-service</module>
     </modules>
 
