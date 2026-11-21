@@ -2,6 +2,9 @@
 # Arranque: podman compose up -d
 # Parada:   podman compose down      (añade -v para borrar los datos)
 
+# Los puertos se publican solo en 127.0.0.1: no se exponen a la red y, en
+# Podman sobre WSL, "localhost" no se queda colgado intentando ::1.
+
 name: petstore
 
 services:
@@ -9,7 +12,7 @@ services:
     image: docker.io/library/mongo:8.0
     container_name: petstore-mongodb
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongodb-data:/data/db
     healthcheck:
@@ -29,8 +32,8 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # Consola de gestión: http://localhost:15672
+      - "127.0.0.1:5672:5672"     # AMQP
+      - "127.0.0.1:15672:15672"   # Consola de gestión: http://localhost:15672
     healthcheck:
       # Comprobación TCP: rabbitmq-diagnostics se ejecutaría como root y crearía
       # una cookie de Erlang que el servidor (usuario rabbitmq) no puede leer.
@@ -43,8 +46,8 @@ services:
     image: docker.io/axllent/mailpit:latest
     container_name: petstore-mailpit
     ports:
-      - "1025:1025"     # SMTP
-      - "8025:8025"     # Web: http://localhost:8025
+      - "127.0.0.1:1025:1025"     # SMTP
+      - "127.0.0.1:8025:8025"     # Web: http://localhost:8025
 
 volumes:
   mongodb-data:

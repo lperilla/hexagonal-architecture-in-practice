@@ -30,7 +30,16 @@ La construcción falla con un mensaje claro si no se usa Java 25.
 
 - La máquina de Podman tiene que estar en marcha: `podman machine start`.
 - **WSL 2.7.5 o superior.** Podman 6 usa nftables para la red de los contenedores, y el kernel de versiones anteriores de WSL no incluye los módulos necesarios (`nft_fib`). Con un WSL antiguo, los contenedores no arrancan y aparece `netavark (exit code 1): nftables error`. Comprueba la versión con `wsl --version` y actualiza con `wsl --update`.
-- **Podman 6.1.1 o superior dentro de la máquina.** Con Podman 6.0.x, los puertos publicados no llegan a `localhost` en Windows: los contenedores arrancan, pero no se puede acceder a ellos desde fuera de la máquina. La versión de la máquina puede ser distinta de la del cliente. Compruébala con `podman version`, en el campo `Server`.
+- **Puertos accesibles desde Windows.** Con Podman 6, los contenedores pueden arrancar bien y aun así ser inaccesibles desde `localhost` en Windows ([podman#29377](https://github.com/containers/podman/issues/29377)). Las máquinas creadas con una imagen reciente ya traen el arreglo. En una máquina más antigua hay que hacer dos cosas:
+  1. Que Podman dentro de la máquina sea la versión 6.1.1 o superior. Compruébalo con `podman version`, en el campo `Server`, y actualízalo con `podman machine ssh sudo dnf -y upgrade podman netavark`.
+  2. Crear dentro de la máquina el fichero `/usr/share/containers/containers.conf.d/999-podman-machine-wsl.conf` con este contenido:
+
+     ```toml
+     [engine]
+     force_port_listen = true
+     ```
+
+  Después, reinicia la máquina. `compose.yaml` publica los puertos solo en `127.0.0.1`, porque en WSL las conexiones a `::1` se quedan colgadas.
 - Testcontainers usa la tubería `\\.\pipe\docker_engine` que crea Podman al arrancar la máquina, sin necesidad de definir `DOCKER_HOST`. Si al arrancar la máquina aparece `win-sshproxy.exe failed to start`, suele deberse a un socket huérfano en `%TEMP%\podman`: para la máquina, renombra esa carpeta y vuelve a arrancarla.
 - En redes corporativas con proxy TLS (por ejemplo, Zscaler), el certificado raíz corporativo debe instalarse **dentro** de la máquina de Podman, no solo en Windows.
 
