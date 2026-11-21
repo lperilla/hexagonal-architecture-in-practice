@@ -74,7 +74,7 @@ podman compose down       # parar (añade -v para borrar los datos de MongoDB)
 
 ```bash
 ./mvnw verify                                        # todo el monorepo
-./mvnw -pl services/adoption-service -am verify      # un solo servicio
+./mvnw -pl services/adoption-service/boot -am verify # un solo servicio (boot y todo lo que necesita)
 ```
 
 En PowerShell, sustituye `./mvnw` por `.\mvnw.cmd`.
@@ -87,8 +87,8 @@ Arranca la infraestructura y el servicio de adopción:
 
 ```bash
 podman compose up -d
-./mvnw -pl services/adoption-service -am -DskipTests package
-java -jar services/adoption-service/target/adoption-service-0.0.1-SNAPSHOT.jar
+./mvnw -pl services/adoption-service/boot -am -DskipTests package
+java -jar services/adoption-service/boot/target/adoption-service-0.0.1-SNAPSHOT.jar
 ```
 
 Al arrancar, el servicio carga tres mascotas disponibles si no existen: 1 Luna, 2 Thor y 3 Kira.
