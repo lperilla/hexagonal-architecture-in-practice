@@ -21,7 +21,7 @@
     <description>Arquitectura hexagonal en la práctica: del diseño al código</description>
 
     <modules>
-        <!-- Un módulo por servicio, en services/ -->
+        <module>services/adoption-service</module>
     </modules>
 
     <properties>
@@ -77,6 +77,9 @@
                             <openApiNullable>false</openApiNullable>
                             <documentationProvider>none</documentationProvider>
                             <annotationLibrary>none</annotationLibrary>
+                            <hideGenerationTimestamp>true</hideGenerationTimestamp>
+                            <generateJsonIncludeAnnotations>false</generateJsonIncludeAnnotations>
+                            <generateJsonSetterNullsAnnotations>false</generateJsonSetterNullsAnnotations>
                         </configOptions>
                     </configuration>
                 </plugin>

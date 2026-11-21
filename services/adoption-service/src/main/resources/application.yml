@@ -1,0 +1,28 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: adoption-service
+
+  mongodb:
+    uri: mongodb://localhost:27017
+    database: petstore-adoption
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: petstore
+    password: petstore
+
+  mvc:
+    problemdetails:
+      enabled: true
+
+  webservices:
+    path: /ws
+    # Publica los .wsdl y .xsd de esta carpeta en /ws/<nombre>.wsdl y /ws/<nombre>.xsd
+    wsdl-locations: classpath:/wsdl
+    servlet:
+      init:
+        transformWsdlLocations: true
