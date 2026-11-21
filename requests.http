@@ -1,0 +1,37 @@
+### Peticiones REST de la demo (extensión REST Client de VS Code o cliente HTTP de IntelliJ)
+### Requisitos: podman compose up -d y adoption-service en marcha.
+### Para volver a empezar: borra la base de datos petstore-adoption y reinicia el servicio (ver README).
+
+@adoption = http://localhost:8080
+
+### 200: adopción correcta (Luna, por Ana)
+POST {{adoption}}/pets/1/adoption
+Content-Type: application/json
+
+{
+  "ownerName": "Ana"
+}
+
+### 409: segunda adopción de la misma mascota
+POST {{adoption}}/pets/1/adoption
+Content-Type: application/json
+
+{
+  "ownerName": "Bea"
+}
+
+### 404: la mascota no existe
+POST {{adoption}}/pets/99/adoption
+Content-Type: application/json
+
+{
+  "ownerName": "Ana"
+}
+
+### 400: nombre del dueño vacío
+POST {{adoption}}/pets/2/adoption
+Content-Type: application/json
+
+{
+  "ownerName": "   "
+}

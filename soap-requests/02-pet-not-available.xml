@@ -1,0 +1,11 @@
+<!-- Segunda adopción de Thor (envíalo después de 01-adopt-pet.xml). Fault PetNotAvailable. -->
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:ad="http://example.com/petstore/adoption">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <ad:AdoptPetRequest>
+         <ad:petId>2</ad:petId>
+         <ad:ownerName>Diana</ad:ownerName>
+      </ad:AdoptPetRequest>
+   </soapenv:Body>
+</soapenv:Envelope>

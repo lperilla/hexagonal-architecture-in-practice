@@ -12,7 +12,7 @@ La charla se organiza en tres bloques:
 
 ## Stack
 
-Java 25 · Spring Boot 4.1.2 · Maven multimódulo · Lombok · MongoDB · RabbitMQ · REST (API first, OpenAPI) · SOAP (contract first, Spring Web Services) · Mailpit · JUnit 6, Mockito, AssertJ, Testcontainers y ArchUnit · Podman.
+Java 25 · Spring Boot 4.1.2 · Maven multimódulo · Lombok · MongoDB · RabbitMQ · REST (API first, OpenAPI) · SOAP (contract first, Spring Web Services) · Mailpit · JUnit 6, Mockito, AssertJ y ArchUnit · Podman.
 
 ## Requisitos
 
@@ -40,7 +40,8 @@ La construcción falla con un mensaje claro si no se usa Java 25.
      ```
 
   Después, reinicia la máquina. `compose.yaml` publica los puertos solo en `127.0.0.1`, porque en WSL las conexiones a `::1` se quedan colgadas.
-- Testcontainers usa la tubería `\\.\pipe\docker_engine` que crea Podman al arrancar la máquina, sin necesidad de definir `DOCKER_HOST`. Si al arrancar la máquina aparece `win-sshproxy.exe failed to start`, suele deberse a un socket huérfano en `%TEMP%\podman`: para la máquina, renombra esa carpeta y vuelve a arrancarla.
+- Si al arrancar la máquina aparece `win-sshproxy.exe failed to start`, suele deberse a un socket huérfano en `%TEMP%\podman`: para la máquina, renombra esa carpeta y vuelve a arrancarla.
+- **`Unable to establish loopback connection` al arrancar un servicio.** Java crea un socket AF_UNIX interno en `%TEMP%`, y algunos equipos corporativos lo bloquean. Indica otra carpeta, que debe existir, añadiendo `-Djdk.net.unixdomain.tmpdir=C:\ruta\a\otra\carpeta` a la variable de entorno `JAVA_TOOL_OPTIONS`.
 - En redes corporativas con proxy TLS (por ejemplo, Zscaler), el certificado raíz corporativo debe instalarse **dentro** de la máquina de Podman, no solo en Windows.
 
 ### Maven y mirrors corporativos
@@ -78,7 +79,31 @@ podman compose down       # parar (añade -v para borrar los datos de MongoDB)
 
 En PowerShell, sustituye `./mvnw` por `.\mvnw.cmd`.
 
-Los tests con Testcontainers necesitan la máquina de Podman en marcha.
+Los tests de extremo a extremo (`AdoptionEndToEndTest`) usan la infraestructura de `compose.yaml`: levántala antes con `podman compose up -d`. Usan su propia base de datos, `petstore-adoption-test`, y no tocan los datos de la demo.
+
+## Demo
+
+Arranca la infraestructura y el servicio de adopción:
+
+```bash
+podman compose up -d
+./mvnw -pl services/adoption-service -am -DskipTests package
+java -jar services/adoption-service/target/adoption-service-0.0.1-SNAPSHOT.jar
+```
+
+Al arrancar, el servicio carga tres mascotas disponibles si no existen: 1 Luna, 2 Thor y 3 Kira.
+
+| Canal | Dónde | Casos |
+|---|---|---|
+| REST | `requests.http` (REST Client de VS Code o IntelliJ) | 200, 409, 404 y 400 en `POST /pets/{petId}/adoption` |
+| SOAP | `soap-requests/` | Adopción, `PetNotAvailable`, `PetNotFound` y nombre vacío. WSDL en http://localhost:8080/ws/adoption.wsdl |
+| Evento | Consola de RabbitMQ | Cada adopción publica `pet.adopted` en el exchange `petstore.events` (contrato en `contracts/events/`) |
+
+Para volver al estado inicial, borra la base de datos y reinicia el servicio:
+
+```bash
+podman exec petstore-mongodb mongosh --quiet petstore-adoption --eval "db.dropDatabase()"
+```
 
 ## Organización
 
@@ -88,6 +113,10 @@ hexagonal-architecture-in-practice/
 ├── mvnw, mvnw.cmd   Maven Wrapper
 ├── .mvn/            Configuración del wrapper y settings.xml del proyecto
 ├── compose.yaml     Infraestructura (Podman)
+├── requests.http    Peticiones REST de la demo
+├── soap-requests/   Sobres SOAP de la demo
+├── contracts/       Contratos de los eventos de RabbitMQ
 ├── services/        Un servicio por carpeta
+│   └── adoption-service/
 └── docs/            Presentación, guía de teoría y cartel
 ```

@@ -1,0 +1,11 @@
+<!-- La mascota 99 no existe. Fault PetNotFound. -->
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:ad="http://example.com/petstore/adoption">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <ad:AdoptPetRequest>
+         <ad:petId>99</ad:petId>
+         <ad:ownerName>Carlos</ad:ownerName>
+      </ad:AdoptPetRequest>
+   </soapenv:Body>
+</soapenv:Envelope>

@@ -1,0 +1,11 @@
+<!-- Nombre del dueño vacío. El XSD lo rechaza: fault de cliente "Validation error". -->
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:ad="http://example.com/petstore/adoption">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <ad:AdoptPetRequest>
+         <ad:petId>3</ad:petId>
+         <ad:ownerName>   </ad:ownerName>
+      </ad:AdoptPetRequest>
+   </soapenv:Body>
+</soapenv:Envelope>
