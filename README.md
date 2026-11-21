@@ -105,6 +105,98 @@ Para volver al estado inicial, borra la base de datos y reinicia el servicio:
 podman exec petstore-mongodb mongosh --quiet petstore-adoption --eval "db.dropDatabase()"
 ```
 
+### Perfil `in-memory`: sustituir la infraestructura
+
+Con el perfil `in-memory`, la persistencia pasa a `InMemoryLoadPetAdapter` e `InMemorySavePetAdapter`, que implementan los mismos puertos que los adaptadores de MongoDB, uno cada uno. Se excluye la autoconfiguración de MongoDB, así que el servicio arranca sin base de datos. El dominio y los casos de uso no cambian. RabbitMQ sigue siendo necesario para publicar el evento.
+
+```bash
+java -jar services/adoption-service/boot/target/adoption-service-0.0.1-SNAPSHOT.jar --spring.profiles.active=in-memory
+```
+
+## Ramas
+
+| Rama | Contenido |
+|---|---|
+| `mvc` | Todos los servicios en arquitectura MVC por capas técnicas, con un único módulo Maven por servicio |
+| `hexagonal` | Nace de `mvc` (etiqueta `00-start`): la migración paso a paso de `adoption-service` a una arquitectura hexagonal multimódulo |
+| `main` | Apunta al final de `hexagonal`. Es la rama por defecto |
+
+Las dos ramas no se fusionan nunca. Tienen el mismo comportamiento externo (mismos contratos OpenAPI, WSDL y eventos, y mismas respuestas), así que `compose.yaml`, `requests.http` y los sobres SOAP funcionan igual en ambas. `AdoptionEndToEndTest` es la prueba: pasa sin cambios en todas las etiquetas.
+
+## Etiquetas de la migración
+
+Cada paso crea o completa un módulo Maven. Todas las etiquetas compilan, arrancan y pasan `./mvnw verify`.
+
+| Etiqueta | Qué cambia | Módulos |
+|---|---|---|
+| `00-start` | Punto de partida: el servicio en capas, con REST y SOAP. Funciona, pero el negocio conoce HTTP, MongoDB y RabbitMQ | Un único módulo |
+| `01-domain` | Modelo de dominio con la regla de adopción, en Java puro | `domain` |
+| `02-input-port` | Caso de uso, comando y resultado. El servicio antiguo implementa el puerto como paso intermedio | `application` |
+| `03-output-ports` | Puertos de salida en el dominio y servicio de aplicación, probado sin Spring | `domain`, `application` |
+| `04-mongodb-adapter` | Adaptador de persistencia | `infrastructure` |
+| `05-rabbitmq-adapter` | Adaptador de publicación del evento | `infrastructure` |
+| `06-rest-adapter` | Contrato OpenAPI, adaptador REST y arranque. Se borra el código acoplado y el endpoint SOAP antiguo pasa a usar el caso de uso | `api-contract`, `api-rest`, `boot` |
+| `07-soap-adapter` | Contrato SOAP y adaptador SOAP: el mismo caso de uso, un segundo canal de entrada | `soap-contract`, `api-soap` |
+| `08-testing` | Adaptador en memoria, contrato común de persistencia y ArchUnit | `infrastructure`, `boot` |
+| `09-final` | Documentación y material de la charla | |
+
+Durante los pasos 01 a 05, los módulos nuevos crecen junto al proyecto en capas, dentro de `services/adoption-service`, y el POM raíz los declara uno a uno. En el paso 06, `services/adoption-service` pasa a ser el agregador de sus módulos.
+
+Para ver un paso concreto:
+
+```bash
+git diff 05-rabbitmq-adapter 06-rest-adapter --stat
+git checkout 03-output-ports
+```
+
+## Comparar `mvc` y `hexagonal`
+
+```bash
+git diff mvc hexagonal --stat -- services/adoption-service
+git diff mvc hexagonal -- services/adoption-service
+```
+
+El mismo caso de uso, `POST /pets/{petId}/adoption` y `AdoptPet`, en las dos arquitecturas:
+
+| Pieza | `mvc` | `hexagonal` |
+|---|---|---|
+| Regla de negocio | `PetService` compara un `String` del documento de MongoDB y lo cambia con setters | `Pet.adopt()` en `domain`: `Pet` es un record inmutable y adoptar devuelve una mascota nueva |
+| Errores | `ResponseStatusException`; el endpoint SOAP traduce códigos HTTP a faults | `PetNotFoundException` y `PetNotAvailableException`, traducidas en `api-rest` y en `api-soap` |
+| Persistencia | El documento con `@Data` es el modelo de negocio | `LoadPetPort` y `SavePetPort`, cada uno con su adaptador: `MongoLoadPetAdapter` y `MongoSavePetAdapter`, o sus equivalentes en memoria |
+| Evento | El servicio usa `RabbitTemplate` directamente | `PublishPetAdoptedPort`, implementado por `RabbitPetAdoptedPublisher` |
+| Composición | `@Service` y escaneo de componentes | `AdoptPetService` sin anotaciones, registrado en `boot` |
+
+## Verificar todas las etiquetas
+
+Con la infraestructura levantada (`podman compose up -d`) y el árbol de trabajo limpio.
+
+Bash:
+
+```bash
+for tag in 00-start 01-domain 02-input-port 03-output-ports 04-mongodb-adapter \
+           05-rabbitmq-adapter 06-rest-adapter 07-soap-adapter 08-testing 09-final; do
+  git checkout -q "$tag" && ./mvnw -q clean verify > /dev/null 2>&1 \
+    && echo "$tag: OK" || { echo "$tag: FALLA"; break; }
+done
+git checkout -q hexagonal
+```
+
+PowerShell:
+
+```powershell
+$tags = '00-start','01-domain','02-input-port','03-output-ports','04-mongodb-adapter',
+        '05-rabbitmq-adapter','06-rest-adapter','07-soap-adapter','08-testing','09-final'
+foreach ($tag in $tags) {
+    git checkout -q $tag
+    .\mvnw.cmd -q clean verify *> $null
+    if ($LASTEXITCODE -ne 0) { "${tag}: FALLA"; break }
+    "${tag}: OK"
+}
+git checkout -q hexagonal
+```
+
+Si tu `~/.m2/settings.xml` usa un mirror corporativo, añade `-s .mvn/settings.xml` a cada `mvnw`.
+
 ## Organización
 
 ```text
@@ -119,4 +211,31 @@ hexagonal-architecture-in-practice/
 ├── services/        Un servicio por carpeta
 │   └── adoption-service/
 └── docs/            Presentación, guía de teoría y cartel
+```
+
+### Módulos de `adoption-service`
+
+```text
+services/adoption-service/       Agregador (packaging pom)
+├── api-contract/    Contrato OpenAPI y código generado (interfaz de la API y DTOs)
+├── soap-contract/   XSD y WSDL, y clases JAXB generadas
+├── domain/          Modelo inmutable (records), reglas, excepciones, eventos y puertos de salida. Sin dependencias
+├── application/     Casos de uso: puerto de entrada, comando, resultado y AdoptPetService. Sin Spring
+├── infrastructure/  Adaptadores MongoDB, RabbitMQ y en memoria: uno por puerto
+├── api-rest/        Adaptador REST: controlador, mapper y errores ProblemDetail
+├── api-soap/        Adaptador SOAP: endpoint, mapper y faults
+└── boot/            Arranque y composición. Único módulo con el JAR ejecutable
+```
+
+Maven impone las dependencias entre módulos: si alguien importa Spring en `domain` o en `application`, el proyecto no compila. `ArchitectureTest`, en `boot`, comprueba con ArchUnit lo que Maven no ve: que los puertos no usen tipos técnicos, que el código generado no salga de su adaptador, que los adaptadores no dependan entre sí y que cada adaptador implemente un único puerto.
+
+```text
+domain          ← sin dependencias
+application     → domain
+infrastructure  → domain, application
+api-contract    → spring-web, jakarta.validation, jackson-annotations
+soap-contract   → jakarta.xml.bind
+api-rest        → application, api-contract
+api-soap        → application, soap-contract
+boot            → todos
 ```
