@@ -30,15 +30,38 @@ Regla de negocio central: una mascota solo puede adoptarse si está disponible. 
 | API síncrona | REST con **API first**: el contrato OpenAPI se escribe primero y el código se genera con `openapi-generator-maven-plugin` |
 | API SOAP | SOAP con **contract first**: el XSD y el WSDL se escriben primero y las clases se generan con un plugin JAXB; endpoints con Spring Web Services |
 | Correo de pruebas | Mailpit |
-| Tests | JUnit 5, Mockito, AssertJ, Testcontainers (MongoDB y RabbitMQ) y ArchUnit |
+| Tests | JUnit 6, Mockito, AssertJ y ArchUnit. **Sin Testcontainers** (decisión de Peri): los tests de integración y de extremo a extremo usan la infraestructura de `compose.yaml` |
 
-### Notas de versión que hay que comprobar, no suponer
+### Versiones verificadas (fase 0, en Maven Central)
 
-- **Spring Boot 4** cambia nombres de algunos starters, paquetes de las anotaciones de test (`@WebMvcTest`, `@DataMongoTest`) y pasa a Jackson 3. Comprobar cada uno en la documentación de la versión 4.1.2 antes de escribir código.
-- **Java 25 y Lombok:** desde Java 23 el procesamiento de anotaciones no se activa solo. Declarar Lombok en `annotationProcessorPaths` de `maven-compiler-plugin` (en `pluginManagement` del POM raíz) y usar una versión de Lombok con soporte para Java 25.
-- **Generadores:** usar versiones de `openapi-generator-maven-plugin` y del plugin JAXB compatibles con Spring Boot 4, Jakarta EE y Jackson 3.
-- **Testcontainers** con la versión que gestiona Spring Boot 4.1.2; los nombres de artefactos y paquetes pueden haber cambiado respecto a versiones anteriores.
-- Si una versión no se resuelve o hay dudas de compatibilidad, **preguntar a Peri en lugar de inventar otra**.
+| Pieza | Versión | Dónde se fija |
+|---|---|---|
+| Spring Boot | 4.1.2 (existe 4.2.0, pero se mantiene 4.1.2) | `parent` del POM raíz |
+| Spring Framework / Data / AMQP / WS | 7.0.10 / 2026.0.2 / 4.1.2 / 5.0.3 | Gestionadas por Boot |
+| Lombok | 1.18.48 (soporta Java 25) | Gestionada por Boot |
+| JUnit Jupiter | **6.0.3** | Gestionada por Boot |
+| AssertJ / Mockito | 3.27.7 / 5.23.0 | Gestionadas por Boot |
+| Jackson | 3.1.7 (`tools.jackson.*`; las anotaciones siguen en `com.fasterxml.jackson.annotation`) | Gestionada por Boot |
+| `openapi-generator-maven-plugin` | 7.27.0 | Propiedad del POM raíz |
+| Plugin JAXB | `org.codehaus.mojo:jaxb2-maven-plugin` 4.3.0 (usa `jaxb-xjc` 4.0.9, igual que el runtime de Boot) | Propiedad del POM raíz |
+| ArchUnit | 1.5.1, artefacto `archunit` **sin el motor de JUnit 5** (las reglas se comprueban desde `@Test` de JUnit 6) | Propiedad del POM raíz |
+| Maven | 3.9.16 con Maven Wrapper 3.3.4 | `.mvn/wrapper/maven-wrapper.properties` |
+
+Si una versión no se resuelve o hay dudas de compatibilidad, **preguntar a Peri en lugar de inventar otra**.
+
+### Spring Boot 4.1.2: lo que cambia y ya está comprobado
+
+- **Starters:** `spring-boot-starter-webmvc` (no `-web`), `-validation`, `-data-mongodb`, `-amqp`, `-webservices` (no `-web-services`), `-mail`, `-jackson`, `-actuator`. Para tests hay starters por tecnología: `spring-boot-starter-webmvc-test` y `spring-boot-starter-data-mongodb-test`, además de `spring-boot-starter-test`.
+- **Paquetes de test:** `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`, `org.springframework.boot.data.mongodb.test.autoconfigure.DataMongoTest`, `org.springframework.boot.test.web.server.LocalServerPort` y `org.springframework.test.context.bean.override.mockito.MockitoBean`.
+- **Propiedades:** MongoDB pasa a `spring.mongodb.uri` y `spring.mongodb.database`. Siguen igual `spring.rabbitmq.*`, `spring.mail.*`, `spring.mvc.problemdetails.enabled`, `spring.webservices.path` y `spring.webservices.wsdl-locations`.
+- **Autoconfiguración de MongoDB** (para excluirla en el perfil `in-memory`): `org.springframework.boot.mongodb.autoconfigure.Mongo*AutoConfiguration` y `org.springframework.boot.data.mongodb.autoconfigure.DataMongo*AutoConfiguration`.
+- **Jackson 3 en Spring AMQP:** `JacksonJsonMessageConverter(JsonMapper)`. En `JsonNode`, `asText()` pasa a `asString()` y `fieldNames()` a `propertyNames()`.
+- **Java 25 y Lombok:** desde Java 23 el procesamiento de anotaciones no se activa solo. Lombok está declarado en `annotationProcessorPaths` de `maven-compiler-plugin`, en el `pluginManagement` del POM raíz. Lombok 1.18.48 añade `@lombok.Generated` al código generado. Esa anotación queda en el bytecode, así que ArchUnit debe permitir el paquete `lombok..`.
+- **Generador OpenAPI:**
+  - opciones `useSpringBoot4`, `useJackson3`, `interfaceOnly`, `skipDefaultInterface`, `useTags`, `useBeanValidation`, `useResponseEntity` y `hideGenerationTimestamp`;
+  - `openApiNullable=false`, `documentationProvider=none`, `annotationLibrary=none`, `generateJsonIncludeAnnotations=false` y `generateJsonSetterNullsAnnotations=false`.
+
+  Están en el `pluginManagement` del POM raíz. El código generado usa `org.springframework.lang.Nullable`, que está deprecado; solo produce avisos.
 
 ## Organización del repositorio
 
@@ -64,11 +87,16 @@ hexagonal-architecture-in-practice/
 
 ### POM raíz
 
-- Hereda de `spring-boot-starter-parent` 4.1.2: todos los servicios comparten la gestión de versiones de Spring Boot, incluidas Lombok, Testcontainers, JUnit y AssertJ.
+- Hereda de `spring-boot-starter-parent` 4.1.2: todos los servicios comparten la gestión de versiones de Spring Boot, incluidas Lombok, JUnit y AssertJ.
 - Declara `<modules>` con cada servicio y fija propiedades comunes: `java.version` 25 y las versiones de lo que Spring Boot no gestiona (ArchUnit, generador OpenAPI, plugin JAXB).
 - En `pluginManagement`: `maven-compiler-plugin` con Lombok como procesador de anotaciones, y la configuración base de los generadores.
+- En `plugins`: `maven-enforcer-plugin`, que exige Java 25 y Maven 3.9 con un mensaje claro.
 - **Sin dependencias en el POM raíz**: cada módulo declara solo lo que usa.
-- Comandos: `./mvnw verify` construye todo; `./mvnw -pl services/adoption-service -am verify` construye un solo servicio.
+- **Todos los módulos heredan directamente del POM raíz** (`relativePath` relativo) y declaran su `groupId`. El agregador de cada servicio hexagonal solo agrupa módulos; no es su padre.
+- Comandos:
+  - `./mvnw verify` construye todo.
+  - Para un solo servicio: en `mvc`, `./mvnw -pl services/<servicio> -am verify`; en `hexagonal`, `./mvnw -pl services/<servicio>/boot -am verify`.
+- **`.mvn/settings.xml`** es un `settings.xml` vacío que descarga de Maven Central. El `settings.xml` de Peri redirige todo al Nexus corporativo, que no es accesible sin VPN, así que hay que pasar `-s .mvn/settings.xml`. El sistema de permisos impidió crear `.mvn/maven.config` para aplicarlo siempre: Peri puede crearlo a mano.
 
 ### Identificadores Maven
 
@@ -94,9 +122,18 @@ Así, `com.example.petstore.adoption:domain` y `com.example.petstore.notificatio
 | `pet-registry-service` | 8081 | `petstore-registry` | Consume `pet.adopted` | REST | Capas | **Capas también**, ver decisión de diseño |
 | `adopter-service` | 8082 | `petstore-adopters` | Ninguno | SOAP | Capas | Hexagonal multimódulo |
 
-Infraestructura en `compose.yaml`: MongoDB 27017, RabbitMQ 5672 (consola de gestión en 15672), Mailpit 1025 (SMTP) y 8025 (web). Todas las bases de datos viven en la misma instancia de MongoDB, pero cada servicio solo accede a la suya.
+Infraestructura en `compose.yaml`: MongoDB 27017, RabbitMQ 5672 (consola de gestión en 15672), Mailpit 1025 (SMTP) y 8025 (web). Todas las bases de datos viven en la misma instancia de MongoDB, pero cada servicio solo accede a la suya. Detalles:
+- Los puertos se publican solo en `127.0.0.1`, porque en Podman sobre WSL las conexiones a `::1` se quedan colgadas.
+- RabbitMQ usa el usuario `petstore` con contraseña `petstore`, porque `guest` no puede conectarse desde fuera del contenedor.
+- El healthcheck de RabbitMQ es una comprobación TCP. `rabbitmq-diagnostics` se ejecutaría como root y crearía una cookie de Erlang que el servidor no puede leer.
+- Los servicios todavía no están en `compose.yaml`: se arrancan con `java -jar`.
 
-**Mensajería:** un exchange de tipo topic, `petstore.events`. Cada consumidor tiene su propia cola enlazada con la routing key del evento (`notification.pet-adopted`, `pet-registry.pet-adopted`) y su cola de mensajes fallidos (`<cola>.dlq`). Los mensajes van en JSON, y cada consumidor los deserializa a su propia clase sin depender de los nombres de clase del productor.
+**Mensajería:** un exchange de tipo topic, `petstore.events`. Cada consumidor tiene su propia cola enlazada con la routing key del evento (`notification.pet-adopted`, `pet-registry.pet-adopted`) y su cola de mensajes fallidos (`<cola>.dlq`). Los mensajes van en JSON, y cada consumidor los deserializa a su propia clase sin depender de los nombres de clase del productor. Cómo está implementado:
+- **Productor:** `JacksonJsonMessageConverter` con un `ClassMapper` vacío, para que **no envíe la cabecera `__TypeId__`**.
+- **Consumidor:**
+  - `setAlwaysConvertToInferredType(true)`: el tipo lo decide el parámetro del listener;
+  - `@JsonIgnoreProperties(ignoreUnknown = true)` en su clase de mensaje;
+  - `default-requeue-rejected: false` y 3 reintentos: después, el mensaje va a la DLQ. Un JSON mal formado va a la DLQ sin reintentos.
 
 ## Ramas
 
@@ -125,9 +162,16 @@ Migración de `adoption-service` en la rama `hexagonal`. **Cada paso crea o comp
 | `08-testing` | Adaptador en memoria, contrato común de persistencia y ArchUnit | `infrastructure`, `boot` |
 | `09-final` | Documentación y material de la charla | |
 
-Al final de cada fase posterior se crean las etiquetas `mvc/fase-N-<nombre>` y `hexagonal/fase-N-<nombre>`. Por ejemplo, `hexagonal/fase-2-notificaciones`.
+Cómo se hizo la migración (así está en las etiquetas):
+- **De 01 a 05**, los módulos nuevos (`domain`, `application` e `infrastructure`) crecen **como subcarpetas de `services/adoption-service`, junto al `src/` del proyecto en capas**, y el POM raíz los declara uno a uno. Así cada paso solo añade un módulo y la aplicación antigua sigue funcionando.
+- **En 02**, `PetService` implementa `AdoptPetUseCase`, y el controlador y el endpoint SOAP ya dependen de la interfaz.
+- **En 03 y 04**, `AdoptPetService` y los adaptadores existen y tienen tests, pero la aplicación antigua no los usa. Además, no depende de `infrastructure`, así que no hay beans duplicados.
+- **En 06**, `services/adoption-service/pom.xml` pasa a ser el agregador (`packaging pom`) y el código acoplado se borra. El endpoint SOAP antiguo vive en `boot` de forma provisional hasta 07, ya usando el caso de uso.
+- **`AdoptionEndToEndTest`** no usa ninguna clase del servicio: solo HTTP, la colección `pets`, el exchange y los contratos. Pasa sin cambios en todas las etiquetas; en 06 se movió a `boot` como renombrado al 100 %.
 
-Todas las etiquetas son anotadas, y cada una debe compilar, arrancar y pasar `./mvnw verify`.
+Al final de cada fase posterior se crean las etiquetas `mvc/fase-N-<nombre>` y `hexagonal/fase-N-<nombre>`. Existen `mvc/fase-2-notificaciones` y `hexagonal/fase-2-notificaciones`.
+
+Todas las etiquetas son anotadas, y cada una debe compilar, arrancar y pasar `./mvnw verify`. Las 10 etiquetas de la migración se verificaron desde un checkout limpio, todas en verde. El README tiene el bucle para repetirlo en bash y en PowerShell.
 
 ## Estructura MVC de un servicio (rama `mvc`)
 
@@ -150,9 +194,13 @@ services/adoption-service/
         ├── model/          Documentos de MongoDB (@Document, @Data)
         ├── client/         Clientes HTTP o SOAP hacia otros servicios
         ├── messaging/      Publicadores y listeners de RabbitMQ
-        ├── exception/      Excepciones, incluidas las que llevan estado HTTP
+        ├── exception/      Excepciones, incluidas las que llevan estado HTTP (no se usa en adopción)
         └── config/         Configuración y datos de demo
 ```
+
+En `adoption-service` no hay carpeta `exception/`: los errores REST salen como `ProblemDetail` con `spring.mvc.problemdetails.enabled=true`, sin manejador propio. Las clases generadas van a `com.example.petstore.adoption.api.contract` (OpenAPI) y a `com.example.petstore.adoption.soap.contract` (JAXB). Son los mismos paquetes que en `hexagonal`.
+
+`notification-service` en `mvc` tiene `messaging/` (listener, `PetAdoptedMessage` y configuración de colas), `service/NotificationService` y `config/NotificationProperties`.
 
 En `adoption-service`, el acoplamiento debe ser visible porque es el material del bloque de malas prácticas:
 
@@ -161,7 +209,16 @@ En `adoption-service`, el acoplamiento debe ser visible porque es el material de
 - El servicio lanza `ResponseStatusException`, así que **el endpoint SOAP tiene que capturar una excepción HTTP para convertirla en un fault SOAP**: es el ejemplo más claro de por qué el negocio no debe conocer el canal.
 - El servicio depende directamente de `RabbitTemplate`.
 
-Tests: unitarios del servicio con Mockito.
+En `notification-service`, el acoplamiento equivalente:
+- `NotificationService` recibe el mensaje de RabbitMQ;
+- construye el texto del email;
+- usa `JavaMailSender` directamente;
+- guarda las adopciones notificadas en un campo `Set`;
+- comprueba el perfil activo con `Environment.matchesProfiles("log-notifications")`.
+
+Tests:
+- unitarios del servicio con Mockito;
+- `AdoptionEndToEndTest` y `NotificationEndToEndTest`, de extremo a extremo y contra `compose.yaml`. Son idénticos en las dos ramas y no dependen de clases del servicio.
 
 ## Estructura hexagonal (rama `hexagonal`)
 
@@ -191,7 +248,31 @@ services/adoption-service/
 | `api-rest` | `api.rest` | Controlador que implementa la interfaz generada, mapper DTO a comando, manejador de errores (`ProblemDetail`) |
 | `soap-contract` | Generados desde `adoption-types.xsd` | Clases JAXB de petición, respuesta y faults |
 | `api-soap` | `api.soap` | Endpoint, mapper y traducción de excepciones de dominio a faults SOAP |
-| `boot` | `boot`, `boot.config` | `AdoptionServiceApplication`, registro de `AdoptPetService` como bean, `application.yml`, perfil `in-memory`, datos de demo, ArchUnit y tests de arranque |
+| `boot` | Paquete raíz del servicio y `boot.config` | `AdoptionServiceApplication`, registro de `AdoptPetService` como bean, `application.yml`, perfil `in-memory`, datos de demo, ArchUnit y tests de arranque |
+
+**`AdoptionServiceApplication` está en el paquete raíz del servicio** (`com.example.petstore.adoption`), no en `...adoption.boot`. Así el escaneo de componentes alcanza `api.rest`, `api.soap` e `infrastructure`, y el test de extremo a extremo encuentra la configuración sin cambios. La configuración va en `...boot.config`: `UseCaseConfig`, con el `@Bean` del caso de uso y un `Clock`, y `DemoDataLoader`, que carga los datos a través de los puertos. El JAR ejecutable se llama `adoption-service-<versión>.jar` gracias a `finalName`.
+
+Nombres reales en el código (la presentación debe usar estos):
+
+| Pieza | Nombre |
+|---|---|
+| Puertos de salida | `LoadPetPort.loadPet(PetId)`, `SavePetPort.savePet(Pet)` y `PublishPetAdoptedPort.publish(PetAdopted)` |
+| Regla de adopción | `Pet.adopt(Owner, Instant)` devuelve el evento `PetAdopted`. Fábricas `Pet.available(...)` y `Pet.restore(...)`; `getOwner()` devuelve `Optional` |
+| Comando | `AdoptPetCommand(PetId, Owner)`, con objetos valor |
+| Adaptador REST | `AdoptionController implements AdoptionApi` (generada), con `AdoptionRestMapper` y `RestExceptionHandler extends ResponseEntityExceptionHandler` |
+| Adaptador SOAP | `AdoptionEndpoint` con `AdoptionSoapMapper`. `AdoptionFaultResolver` traduce las excepciones de dominio a faults; el endpoint no captura excepciones |
+| Publicación del evento | `RabbitPetAdoptedPublisher`, con `PetAdoptedMessage` y `RabbitConfig` |
+| Persistencia en memoria | `InMemoryPetAdapter` guarda copias de las mascotas. El contrato común es `PetPersistenceContract`, en los tests de `infrastructure` |
+| ArchUnit | `ArchitectureTest`, con 8 reglas |
+
+`notification-service` (hexagonal):
+
+| Módulo | Contenido |
+|---|---|
+| `domain` | `Adoption`, `AdoptionKey`, `EmailAddress` y `Notification.adoptionNotice(...)`, que fija el texto del aviso. Puertos `SendNotificationPort` y `NotifiedAdoptionsPort` |
+| `application` | `NotifyAdoptionUseCase.notifyAdoption(NotifyAdoptionCommand)`, que devuelve `NotificationResult`, y `NotifyAdoptionService` |
+| `infrastructure` | `rabbitmq.listener.PetAdoptedListener` y `PetAdoptedMessage`, `rabbitmq.RabbitConfig`, `mail.SmtpNotificationSender`, `logging.LogNotificationSender` (perfil `log-notifications`) e `inmemory.InMemoryNotifiedAdoptions` |
+| `boot` | `NotificationServiceApplication`, `boot.config.UseCaseConfig` y `NotificationProperties` (`notification.shelter-email` y `notification.from-email`) |
 
 Los **puertos de salida viven en `domain`** (`domain.port`), y los de entrada en `application` (`application.port.in`). En la charla hay que explicar que es una variante válida: lo que importa es que el núcleo define los puertos y la tecnología los implementa.
 
@@ -211,7 +292,7 @@ boot            → todos los anteriores; único módulo con spring-boot-maven-p
 ```
 
 - `api-rest` y `api-soap` **no dependen de `infrastructure`**, ni al revés.
-- Si alguien importa Spring o MongoDB en `domain` o en `application`, **el proyecto no compila**. ArchUnit, en `boot`, comprueba además las reglas que Maven no puede ver (por ejemplo, que `domain.port` no use tipos de `infrastructure`).
+- Si alguien importa Spring o MongoDB en `domain` o en `application`, **el proyecto no compila**. Está comprobado: `package org.springframework.stereotype does not exist`. ArchUnit, en `boot`, comprueba además las reglas que Maven no puede ver (por ejemplo, que `domain.port` no use tipos de `infrastructure`). Usa el artefacto `archunit`, sin su motor, con `@Test` de JUnit 6, y permite `lombok..` por la anotación `@lombok.Generated`.
 - Solo `boot` produce el JAR ejecutable.
 
 ### Uso de Lombok
@@ -242,18 +323,34 @@ Los contratos REST y SOAP son la fuente de verdad (**API first** y **contract fi
 | SOAP de adoptantes | Operaciones `RegisterAdopter` y `CheckEligibility`. Respuesta de elegibilidad: `{eligible, reason}` |
 | Evento `pet.adopted` | `{"petId", "petName", "ownerName", "adoptedAt"}`. Desde la fase 4 se añade `adopterId` |
 
+Detalles de los contratos de adopción, aprobados en la fase 1:
+- **OpenAPI:** versión 3.0.3. `petId` es un `string`. `ownerName` no puede estar vacío ni tener solo espacios (patrón `.*\S.*`) y tiene como máximo 100 caracteres. `status` es el enumerado `PetStatus` (`AVAILABLE`, `ADOPTED`). Los errores usan el esquema `Problem` (RFC 9457) con `application/problem+json`; se llama así para no chocar con `ProblemDetail` de Spring. Los mensajes van en español: «La mascota 99 no existe» y «La mascota 1 no está disponible para adopción».
+- **SOAP, ficheros:** `adoption.wsdl` (escrito a mano, WSDL 1.1, document/literal, SOAP 1.1) importa **`adoption-types.xsd`**. El XSD no se llama `adoption.xsd` porque Spring WS busca el WSDL y el XSD por el nombre sin extensión, y no puede publicar dos ficheros que se llamen igual.
+- **SOAP, publicación:** `spring.webservices.wsdl-locations=classpath:/wsdl` publica `/ws/adoption.wsdl` y `/ws/adoption-types.xsd`.
+- **SOAP, faults y validación:** los elementos de detalle son `PetNotFoundFault` y `PetNotAvailableFault`, con `petId` y `message`. Las peticiones se validan contra el XSD, y un nombre vacío devuelve un fault `Client` «Validation error».
+- **Evento:** el contrato está en `contracts/events/pet-adopted.json`, con el ejemplo, el exchange, la routing key, los consumidores y las reglas de compatibilidad.
+- **MongoDB:** la colección `pets` tiene los campos `_id`, `name`, `status` y `ownerName`, y debe conservar esa forma en las dos ramas.
+
 ## Fases
 
 Cada fase termina con las dos ramas en verde, el README actualizado y una revisión de Peri antes de empezar la siguiente.
 
 **Antes de la charla del 4 de diciembre hay que cerrar las fases 0, 1 y 2.** Las fases 3 y 4 son material ampliado, y solo se abordan si queda tiempo. La fase 5 son ideas, no se implementa.
 
+| Fase | Estado |
+|---|---|
+| 0. Entorno y base | ✅ Hecha y revisada |
+| 1. `adoption-service` | ✅ Hecha y revisada (de `00-start` a `09-final`) |
+| 2. `notification-service` | ✅ Hecha y revisada (`mvc/fase-2-notificaciones` y `hexagonal/fase-2-notificaciones`) |
+| Presentación y guía | ⏳ Pendiente: adaptarlas al stack nuevo antes de la charla |
+| 3 y 4 | Material ampliado, sin empezar |
+
 ### Fase 0: entorno y base
 
-- Comprobar Java 25, Maven y Podman en la máquina de Peri. Configurar Testcontainers para Podman: `DOCKER_HOST` apuntando al socket de Podman y, si el contenedor Ryuk falla, desactivarlo. Seguir la documentación de Testcontainers para Podman.
-- Comprobar que se resuelven Spring Boot 4.1.2, Lombok, los generadores y Testcontainers. Dejar las versiones en el POM raíz.
-- Crear el POM raíz, el Maven Wrapper, `compose.yaml` (MongoDB, RabbitMQ y Mailpit) y el README base.
-- Existe un repositorio anterior, `petstore-hexagonal` (Java 21, Spring Boot 3.5, Kafka, sin Lombok, un único módulo), con etiquetas `00-start` a `08-final`. **Sirve solo como referencia** de dominio, tests y casos de demo; el código se reescribe con el nuevo stack.
+- Java 25, Maven y Podman comprobados, con los problemas y arreglos que recoge la sección «Entorno de Peri».
+- Versiones resueltas y fijadas en el POM raíz: la tabla está en «Versiones verificadas».
+- POM raíz, Maven Wrapper, `compose.yaml` (MongoDB, RabbitMQ y Mailpit) y README base creados.
+- El repositorio anterior, `petstore-hexagonal`, no está disponible en la máquina. El código se escribió a partir de este documento y de los contratos.
 
 ### Fase 1: `adoption-service` en las dos ramas
 
@@ -263,7 +360,16 @@ Cada fase termina con las dos ramas en verde, el README actualizado y una revisi
 
 ### Fase 2: `notification-service` (prioritaria para la charla)
 
-Cuando se completa una adopción, envía un email al refugio: "Luna ha sido adoptada por Ana". La dirección del refugio se configura en `application.yml`. Los emails se ven en Mailpit (http://localhost:8025).
+Cuando se completa una adopción, envía un email al refugio con el asunto **"Ana ha adoptado a Luna"**. Se usa esta frase y no «Luna ha sido adoptada por Ana» porque no tiene género: funciona también con Thor. La dirección del refugio se configura en `application.yml` (`notification.shelter-email`). Los emails se ven en Mailpit (http://localhost:8025).
+
+Decisiones tomadas al implementarla:
+- **Idempotencia:** la clave es `petId` + `adoptedAt`, porque el evento no tiene identificador propio. La adopción se marca como notificada **después** de enviar el email, así que si el envío falla, el reintento lo vuelve a intentar.
+- **Reintentos:** 3, con 500 ms entre ellos. Después, el mensaje va a `notification.pet-adopted.dlq`.
+- **Puerto 8083:** con `webmvc` y `actuator`, el servicio solo publica `/actuator/health`.
+- **`NotificationEndToEndTest`:**
+  - publica en RabbitMQ y comprueba el email en la API de Mailpit;
+  - usa nombres de mascota únicos y no borra los emails que haya en Mailpit;
+  - no debe ejecutarse con `notification-service` arrancado, porque los dos consumirían de la misma cola.
 
 - Hexagonal, con los módulos `domain`, `application`, `infrastructure` y `boot`, sin módulos de API: este servicio no publica ninguna.
 - En `infrastructure`: listener de RabbitMQ (adaptador de entrada) que invoca `NotifyAdoptionUseCase`, y dos implementaciones del puerto `SendNotificationPort`: SMTP (hacia Mailpit) y log (perfil `log-notifications`).
@@ -325,7 +431,13 @@ La presentación actual se escribió para el stack anterior (Java 21, Kafka, sin
 
 ### Cambios pendientes en la presentación
 
-1. **Stack nuevo:** sustituir Kafka por RabbitMQ en código, diagramas y textos; usar Lombok en el código mostrado según las reglas de este documento; reflejar Java 25 y Spring Boot 4.1.2; actualizar las etiquetas (`05-rabbitmq-adapter`, `07-soap-adapter`, `08-testing`, `09-final`).
+1. **Stack nuevo:**
+   - sustituir Kafka por RabbitMQ en código, diagramas y textos (hoy aparece 39 veces);
+   - usar Lombok en el código mostrado, según las reglas de este documento;
+   - reflejar Java 25 y Spring Boot 4.1.2;
+   - actualizar las etiquetas a las reales, de `00-start` a `09-final`. Ojo al orden: MongoDB es 04, RabbitMQ 05, REST 06, SOAP 07 y testing 08;
+   - el código de `SRC` debe coincidir con los nombres de la tabla «Nombres reales en el código». Por ejemplo, `loadPet` y `savePet`, `domain/port` en lugar de `application/port/out`, y módulos en lugar de paquetes `adapter/`;
+   - `docker compose` pasa a `podman compose`, y `spring-boot:run` a `java -jar` desde `boot`.
 2. **Estructura de módulos:** una pantalla con los módulos (`api-contract`, `soap-contract`, `domain`, `application`, `infrastructure`, `api-rest`, `api-soap`, `boot`) colocados sobre el diagrama hexagonal, con las dependencias que impone Maven. Actualizar la tabla de puertos: los de salida se definen en `domain`.
 3. **Adaptador SOAP:** una pantalla que muestre el mismo caso de uso servido por REST y por SOAP, y otra en el bloque de malas prácticas con el endpoint SOAP de la rama `mvc` capturando una excepción HTTP.
 4. **API first y contract first:** una pantalla en el bloque de decisiones de diseño sobre escribir los contratos antes que el código, y por qué el código generado no debe salir de su módulo.
@@ -349,7 +461,9 @@ Pendiente: adaptarla al stack nuevo (RabbitMQ, SOAP, módulos Maven y Lombok) y 
 ## Forma de trabajar
 
 - Una fase cada vez. Al terminar, resume lo hecho y espera la revisión de Peri antes de seguir.
-- Antes de cada etiqueta, `./mvnw verify` en verde. Los tests con Testcontainers necesitan Podman en marcha.
+- Antes de cada etiqueta, `./mvnw verify` en verde y la aplicación arrancando contra `compose.yaml`. Los tests de integración y de extremo a extremo **necesitan `podman compose up -d`**. Cada uno usa su propia base de datos (`petstore-adoption-test`, `petstore-adoption-infra-test`) o su propia cola, y no toca los datos de la demo.
+- Los tests de extremo a extremo de cada servicio son **el mismo fichero en las dos ramas** y no dependen de clases del servicio. Son la prueba de que el comportamiento externo no cambia.
+- Las fases se implementan primero en `mvc` y después en `hexagonal`; el test de extremo a extremo se copia con `git show mvc:<ruta>`. Las dos ramas no se fusionan: los cambios comunes, como este documento, se llevan con `git cherry-pick`.
 - Commits en español, en imperativo y descriptivos. Un commit por paso lógico.
 - **No hacer push sin permiso.** Nunca `--force` ni reescritura de historial publicado sin confirmación explícita.
 - No inventar versiones de dependencias: si una versión no se resuelve, preguntar.
@@ -359,3 +473,19 @@ Pendiente: adaptarla al stack nuevo (RabbitMQ, SOAP, módulos Maven y Lombok) y 
 ## Entorno de Peri
 
 Windows con PowerShell y VS Code. Red corporativa con Zscaler y VPN GlobalProtect, que a veces provocan errores TLS con Git, Maven y Podman. En Podman, el certificado raíz corporativo debe instalarse dentro de la máquina virtual de Podman, no solo en Windows. Si una descarga, una imagen o un push fallan por certificados, sospecha primero del proxy.
+
+Problemas encontrados en las fases 0 a 2 y cómo se resolvieron:
+
+| Problema | Causa | Arreglo |
+|---|---|---|
+| `java -version` da 21 | `JAVA_HOME` apunta a `C:\dev-tools\java\jdk-21.0.9`. El JDK 25 está en `C:\dev-tools\java\jdk-25.0.4.1` | Usar el JDK 25 en los comandos (`$env:JAVA_HOME=...`). **Pendiente** que Peri cambie su `JAVA_HOME`. El enforcer avisa si se usa Java 21 |
+| Maven no descarga sin VPN | `~/.m2/settings.xml` redirige todo al Nexus corporativo | `-s .mvn/settings.xml` en cada `mvnw`. **Pendiente** que Peri cree `.mvn/maven.config` |
+| `Unable to establish loopback connection` al arrancar Tomcat o cualquier `Selector` de Java | El equipo bloquea los sockets AF_UNIX en `%TEMP%` (`AppData\Local\Temp`) | `-Djdk.net.unixdomain.tmpdir=C:\lperilla\tmp` en `JAVA_TOOL_OPTIONS`. Se usa solo en la sesión; **pendiente** que Peri lo fije en su variable de usuario |
+| `win-sshproxy.exe failed to start` y sin `\\.\pipe\docker_engine` | Por la misma causa, queda un socket huérfano en `%TEMP%\podman` que no se puede borrar (Error 1920) y que reaparece cada vez que se para la máquina | Parar la máquina, **renombrar** `%TEMP%\podman` y volver a arrancarla |
+| `netavark: nftables error` y ningún contenedor arranca | El kernel de WSL 2.6.1 no incluye `nft_fib` | `wsl --update`, que dejó WSL 3.0.5 con el kernel 6.18 |
+| Contenedores en marcha, pero inaccesibles desde `localhost` en Windows | Regresión de Podman 6.0.x dentro de la máquina, [podman#29377](https://github.com/containers/podman/issues/29377) | Podman 6.2.0 dentro de la máquina (`sudo dnf upgrade podman netavark`) y `/usr/share/containers/containers.conf.d/999-podman-machine-wsl.conf` con `[engine] force_port_listen = true` |
+| `localhost` se queda colgado y `127.0.0.1` funciona | En WSL, `::1` se acepta pero no responde | Puertos publicados en `127.0.0.1` en `compose.yaml` |
+| Aparece un fichero `NUL` en el repositorio | `podman machine ssh` lanzado desde la carpeta del proyecto escribe ahí su `known_hosts`. `curl.exe -o NUL` en PowerShell hace lo mismo | Lanzar `podman machine ssh` desde otra carpeta y borrar `NUL` si aparece |
+| Tildes rotas en la salida de `Invoke-RestMethod` | Windows PowerShell 5.1 decodifica mal el UTF-8 | Solo es la visualización: los datos son correctos |
+
+Herramientas de la máquina: Git 2.54, Podman 6.1.4 (cliente) con la máquina WSL rootful `podman-machine-default`, y `podman compose`, que usa `docker-compose` 2.39 como proveedor.
