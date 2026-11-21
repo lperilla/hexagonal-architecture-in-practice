@@ -71,6 +71,17 @@ class AdoptPetServiceTest {
         assertThat(publisher.events).isEmpty();
     }
 
+    @Test
+    void publishesNothingIfThePetCannotBeSaved() {
+        pets.add(Pet.available(new PetId("1"), "Luna"));
+        pets.failOnSave = true;
+
+        assertThatThrownBy(() -> adoptPetService.adopt(command("1", "Ana")))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(publisher.events).isEmpty();
+    }
+
     private static AdoptPetCommand command(String petId, String ownerName) {
         return new AdoptPetCommand(new PetId(petId), new Owner(ownerName));
     }
@@ -79,6 +90,7 @@ class AdoptPetServiceTest {
 
         private final Map<PetId, Pet> pets = new HashMap<>();
         private int saveCount;
+        private boolean failOnSave;
 
         void add(Pet pet) {
             pets.put(pet.id(), pet);
@@ -95,6 +107,9 @@ class AdoptPetServiceTest {
 
         @Override
         public void savePet(Pet pet) {
+            if (failOnSave) {
+                throw new IllegalStateException("La base de datos no responde");
+            }
             saveCount++;
             pets.put(pet.id(), pet);
         }

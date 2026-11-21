@@ -4,6 +4,9 @@ import com.example.petstore.adoption.domain.model.Owner;
 import com.example.petstore.adoption.domain.model.Pet;
 import com.example.petstore.adoption.domain.model.PetId;
 import com.example.petstore.adoption.domain.model.PetStatus;
+import com.example.petstore.adoption.domain.port.LoadPetPort;
+import com.example.petstore.adoption.domain.port.SavePetPort;
+import com.example.petstore.adoption.infrastructure.PetPersistenceContract;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,11 +18,12 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Prueba los adaptadores de MongoDB contra el MongoDB de compose.yaml, en su propia base de datos.
+ * Los adaptadores de MongoDB cumplen el contrato común de persistencia. Usan el MongoDB de
+ * compose.yaml, en su propia base de datos.
  */
 @DataMongoTest(properties = "spring.mongodb.database=petstore-adoption-infra-test")
 @Import({MongoLoadPetAdapter.class, MongoSavePetAdapter.class, PetMongoMapper.class})
-class MongoPetAdaptersTest {
+class MongoPetAdaptersTest extends PetPersistenceContract {
 
     @Autowired
     private MongoLoadPetAdapter loadAdapter;
@@ -35,32 +39,14 @@ class MongoPetAdaptersTest {
         mongoTemplate.getCollection("pets").deleteMany(new Document());
     }
 
-    @Test
-    void savesAndLoadsAnAvailablePet() {
-        saveAdapter.savePet(Pet.available(new PetId("1"), "Luna"));
-
-        assertThat(loadAdapter.loadPet(new PetId("1")))
-                .hasValueSatisfying(pet -> {
-                    assertThat(pet.name()).isEqualTo("Luna");
-                    assertThat(pet.status()).isEqualTo(PetStatus.AVAILABLE);
-                    assertThat(pet.owner()).isNull();
-                });
+    @Override
+    protected LoadPetPort loadPetPort() {
+        return loadAdapter;
     }
 
-    @Test
-    void savesAndLoadsAnAdoptedPet() {
-        saveAdapter.savePet(new Pet(new PetId("1"), "Luna", PetStatus.ADOPTED, new Owner("Ana")));
-
-        assertThat(loadAdapter.loadPet(new PetId("1")))
-                .hasValueSatisfying(pet -> {
-                    assertThat(pet.status()).isEqualTo(PetStatus.ADOPTED);
-                    assertThat(pet.owner()).isEqualTo(new Owner("Ana"));
-                });
-    }
-
-    @Test
-    void returnsNothingForAnUnknownPet() {
-        assertThat(loadAdapter.loadPet(new PetId("99"))).isEmpty();
+    @Override
+    protected SavePetPort savePetPort() {
+        return saveAdapter;
     }
 
     @Test

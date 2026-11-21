@@ -1,0 +1,12 @@
+# Perfil in-memory: la persistencia se sustituye por los adaptadores en memoria sin tocar el dominio ni
+# los casos de uso. Se excluye la autoconfiguración de MongoDB para arrancar sin base de datos.
+# Arranque: java -jar adoption-service-<versión>.jar --spring.profiles.active=in-memory
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration
+      - org.springframework.boot.mongodb.autoconfigure.MongoReactiveAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoReactiveAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration
+      - org.springframework.boot.data.mongodb.autoconfigure.DataMongoReactiveRepositoriesAutoConfiguration
