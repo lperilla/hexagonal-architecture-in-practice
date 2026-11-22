@@ -343,7 +343,7 @@ Cada fase termina con las dos ramas en verde, el README actualizado y una revisi
 | 1. `adoption-service` | ✅ Hecha y revisada (de `00-start` a `09-final`) |
 | 2. `notification-service` | ✅ Hecha y revisada (`mvc/fase-2-notificaciones` y `hexagonal/fase-2-notificaciones`) |
 | Presentación | ✅ Adaptada al stack nuevo, en tres bloques y 50 minutos |
-| Guía de teoría | ⏳ Pendiente: adaptarla al stack nuevo antes de la charla |
+| Guía de teoría | ✅ Adaptada al stack nuevo y a los tres bloques |
 | 3 y 4 | Material ampliado, sin empezar |
 
 ### Fase 0: entorno y base
@@ -447,7 +447,24 @@ El cartel de difusión debe guardarse en `docs/banner-charla.png`.
 
 Guía del ponente. Usa la analogía del restaurante: recetas como dominio, jefe de cocina como servicio de aplicación, comanda como comando, camarero como adaptador de entrada, "necesito tomates" como puerto de salida y proveedor como adaptador de salida. Incluye DDD, SOLID, cuándo sí y cuándo no, técnicas para que la charla no sea aburrida y respuestas a preguntas difíciles.
 
-Pendiente: adaptarla al stack nuevo (RabbitMQ, SOAP, módulos Maven y Lombok) y añadir los nuevos servicios con la misma analogía. Por ejemplo: REST y SOAP son la mesa y el teléfono, dos formas de pedir el mismo plato; Notificaciones es el aviso al repartidor.
+**Adaptada al stack nuevo:** RabbitMQ, SOAP, módulos Maven, Lombok y los nombres reales del código. Ampliaciones respecto a la versión anterior:
+- La analogía incluye los nuevos canales: REST y SOAP son la mesa y el teléfono, y `notification-service` es el aviso al repartidor (la idempotencia es «ya llamé por la mesa 7», y la DLQ es la bandeja de incidencias).
+- Un mapa de los tres bloques con las secciones y las etiquetas de cada uno.
+- Secciones nuevas:
+  - el mismo caso de uso por REST y SOAP;
+  - módulos Maven;
+  - contratos primero;
+  - mensajería;
+  - buenas y malas prácticas.
+- Preguntas difíciles nuevas:
+  - Lombok en el dominio;
+  - puertos de salida en `domain`;
+  - módulos frente a paquetes;
+  - por qué SOAP;
+  - DTOs compartidos;
+  - mensajes duplicados.
+
+**Si cambia el código, revisar también los fragmentos y los nombres de clase de la guía.**
 
 ## Forma de trabajar
 
