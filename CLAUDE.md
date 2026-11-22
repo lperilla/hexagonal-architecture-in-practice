@@ -342,7 +342,8 @@ Cada fase termina con las dos ramas en verde, el README actualizado y una revisi
 | 0. Entorno y base | ✅ Hecha y revisada |
 | 1. `adoption-service` | ✅ Hecha y revisada (de `00-start` a `09-final`) |
 | 2. `notification-service` | ✅ Hecha y revisada (`mvc/fase-2-notificaciones` y `hexagonal/fase-2-notificaciones`) |
-| Presentación y guía | ⏳ Pendiente: adaptarlas al stack nuevo antes de la charla |
+| Presentación | ✅ Adaptada al stack nuevo, en tres bloques y 50 minutos |
+| Guía de teoría | ⏳ Pendiente: adaptarla al stack nuevo antes de la charla |
 | 3 y 4 | Material ampliado, sin empezar |
 
 ### Fase 0: entorno y base
@@ -411,44 +412,34 @@ Registro de adoptantes con nombre, email y fecha de nacimiento. Expone, por **SO
 
 Página web navegable en un único HTML, sin dependencias, que funciona sin conexión. El código que muestra está en el objeto `SRC` y el guion en `MODULES`. **Si cambia el código del repositorio, hay que actualizar `SRC` para que coincida.**
 
-Teclas: flechas o mando para navegar, S para ver la solución, N para las notas del ponente, P para el modo presentación y T para el cronómetro.
+Teclas: flechas o mando para navegar, S para ver la solución, N para las notas del ponente, P para el modo presentación, T para el cronómetro y C para cambiar entre modo claro y oscuro.
 
-La presentación actual se escribió para el stack anterior (Java 21, Kafka, sin Lombok, un único módulo). **Hay que adaptarla al stack nuevo.**
+**Adaptada al stack nuevo** (Java 25, Spring Boot 4.1.2, RabbitMQ, SOAP, módulos Maven y Lombok), con los 12 cambios que estaban pendientes aplicados:
+- **Identidad visual del cartel**, aprobada por Peri: verde petróleo `#0E1A1E`, núcleo naranja `#F47A20`, adaptadores turquesa `#2EC4B6` y texto crema `#F3EEE3`. **Oscuro por defecto**; el modo claro usa los mismos tonos y se recuerda en el navegador.
+- **Tres bloques visibles** en el menú lateral, en la cabecera y en el pie de cada pantalla. El objeto `BLOCKS` y el campo `block` de cada módulo los definen.
+- **Código en vivo marcado:** las pantallas con `live` muestran «Código en vivo · <etiqueta>», y sus notas indican la rama y la etiqueta de partida.
+- **`SRC` es el código real del repositorio:** extractos, con lo omitido indicado con `// ...`. Incluye `mvc` (00-start), las etiquetas 01 a 08 y `notification-service`.
+- **Comprobada sin errores en las 47 pantallas.** A 1920×1080 en modo presentación no desborda ninguna, ni en ancho ni en alto. A 1280×760, algunas piden scroll vertical. Las líneas de código largas se parten dentro del panel.
 
-### Estructura actual y relación con los tres bloques
+### Estructura: 50 minutos en tres bloques
 
-| Módulo actual | Bloque |
-|---|---|
-| 0. Portada y punto de partida | Introducción |
-| 1. La aplicación que funciona, pero está acoplada (rama `mvc`) | Malas prácticas |
-| 2. Teoría: las piezas de la arquitectura hexagonal | Puertos y adaptadores |
-| 3 a 6. Pasos 1 a 4: dominio, puerto de entrada, puertos de salida, adaptadores | Puertos y adaptadores (código en vivo) |
-| 7. El beneficio visible: sustituir infraestructura | Ventajas |
-| 8. Testing por capas | Ventajas |
-| 9. Hexagonal, DDD y SOLID | Decisiones de diseño |
-| 10. Errores frecuentes y decisiones pragmáticas | Buenas y malas prácticas |
-| 11. Cierre | Conclusiones |
+| Bloque | Módulo | Min | En vivo |
+|---|---|---|---|
+| Introducción | 0. Portada (título del cartel, «Código en vivo», agenda de bloques) y pregunta para el final | 2 | |
+| 1 · Puertos y adaptadores | 1. Funciona, pero está acoplada (rama `mvc`, incluido el endpoint SOAP que captura una excepción HTTP) | 5 | Opcional, `00-start` |
+| | 2. Las piezas de la arquitectura hexagonal, con los módulos Maven sobre el hexágono | 6 | |
+| | 3. Construir el núcleo: dominio, puerto de entrada, servicio y puertos de salida | 7 | `01-domain` a `03-output-ports` |
+| | 4. Conectar los adaptadores: MongoDB, RabbitMQ, REST y SOAP | 7 | `04-mongodb-adapter` a `07-soap-adapter` |
+| | 5. Un adaptador de entrada que no es REST: `notification-service` y la demo de Mailpit | 4 | `hexagonal/fase-2-notificaciones` |
+| 2 · Buenas y malas prácticas | 6. `mvc` frente a `hexagonal`, lado a lado | 3 | |
+| | 7. Errores frecuentes, buenas prácticas y ArchUnit | 6 | |
+| 3 · Ventajas y decisiones de diseño | 8. Ventajas: sustituir infraestructura, testing por capas, ventajas y costes | 4 | `08-testing` |
+| | 9. Decisiones: API first y contract first, decisiones de diseño, cuándo sí y cuándo no, DDD y SOLID (consulta) | 4 | |
+| Cierre | 10. Cinco reglas, la pregunta del principio y para seguir | 2 | |
 
-### Cambios pendientes en la presentación
+Las pantallas marcadas como **recortables** en las notas dicen cuánto tiempo ahorran. DDD y SOLID quedan como material de consulta.
 
-1. **Stack nuevo:**
-   - sustituir Kafka por RabbitMQ en código, diagramas y textos (hoy aparece 39 veces);
-   - usar Lombok en el código mostrado, según las reglas de este documento;
-   - reflejar Java 25 y Spring Boot 4.1.2;
-   - actualizar las etiquetas a las reales, de `00-start` a `09-final`. Ojo al orden: MongoDB es 04, RabbitMQ 05, REST 06, SOAP 07 y testing 08;
-   - el código de `SRC` debe coincidir con los nombres de la tabla «Nombres reales en el código». Por ejemplo, `loadPet` y `savePet`, `domain/port` en lugar de `application/port/out`, y módulos en lugar de paquetes `adapter/`;
-   - `docker compose` pasa a `podman compose`, y `spring-boot:run` a `java -jar` desde `boot`.
-2. **Estructura de módulos:** una pantalla con los módulos (`api-contract`, `soap-contract`, `domain`, `application`, `infrastructure`, `api-rest`, `api-soap`, `boot`) colocados sobre el diagrama hexagonal, con las dependencias que impone Maven. Actualizar la tabla de puertos: los de salida se definen en `domain`.
-3. **Adaptador SOAP:** una pantalla que muestre el mismo caso de uso servido por REST y por SOAP, y otra en el bloque de malas prácticas con el endpoint SOAP de la rama `mvc` capturando una excepción HTTP.
-4. **API first y contract first:** una pantalla en el bloque de decisiones de diseño sobre escribir los contratos antes que el código, y por qué el código generado no debe salir de su módulo.
-5. **Portada:** título y subtítulo del cartel, "Arquitectura hexagonal en la práctica" y "Del diseño al código", con la etiqueta "Código en vivo" y los tres bloques como agenda.
-6. **Hacer visibles los tres bloques** en el menú lateral y en la cabecera de cada pantalla.
-7. **Bloque "Buenas y malas prácticas":** añadir una pantalla de buenas prácticas en el mismo formato que los errores frecuentes, y una comparación lado a lado entre el código de `mvc` y el de `hexagonal`.
-8. **Bloque "Ventajas y decisiones de diseño":** una pantalla de ventajas y costes y otra que reúna las decisiones de diseño: sin `@Data` en el dominio, puertos sin detalles técnicos, `LoadPetPort` y `SavePetPort` separados, publicación sin outbox en la demo, servicio de aplicación sin `@Service`, sin librería de DTOs compartida, un `groupId` por servicio, módulos solo donde hacen falta, el registro como MVC, y cuándo sí y cuándo no.
-9. **Integración en vivo (tras la fase 2):** una pantalla sobre `notification-service` como adaptador de entrada por mensajería, con la demo de Mailpit.
-10. **Momentos de código en vivo:** marcar en las notas del ponente qué pantallas se hacen en el IDE, con la rama y la etiqueta de partida de cada una.
-11. **Tiempo:** la suma actual es de unos 65 minutos para 50 disponibles, y los cambios añaden pantallas. Al reorganizar en bloques, ajustar las duraciones para que sumen 50, usando las pantallas marcadas como recortables y dejando el resto como material de consulta.
-12. **Identidad visual (consultar a Peri antes de aplicarla):** el cartel usa fondo oscuro verde petróleo (aprox. `#0E1A1E`), naranja para el núcleo (aprox. `#F47A20`), turquesa para los hexágonos exteriores (aprox. `#2EC4B6`) y texto crema (aprox. `#F3EEE3`). Si se aplica, conservar el modo claro y el oscuro.
+Para comprobarla después de cambiarla, hay dos pasos. Primero, extraer el `<script>` y pasarlo por `node --check`. Después, ejecutarlo con un DOM mínimo y generar el `body()` de todas las pantallas, buscando `undefined`, `NaN` o `[object Object]`. Para verla, se puede servir `docs/` con `jwebserver` (con `-J-Djdk.net.unixdomain.tmpdir=...`).
 
 El cartel de difusión debe guardarse en `docs/banner-charla.png`.
 
