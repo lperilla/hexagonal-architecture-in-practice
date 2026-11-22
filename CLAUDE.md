@@ -441,6 +441,14 @@ Las pantallas marcadas como **recortables** en las notas dicen cuánto tiempo ah
 
 Para comprobarla después de cambiarla, hay dos pasos. Primero, extraer el `<script>` y pasarlo por `node --check`. Después, ejecutarlo con un DOM mínimo y generar el `body()` de todas las pantallas, buscando `undefined`, `NaN` o `[object Object]`. Para verla, se puede servir `docs/` con `jwebserver` (con `-J-Djdk.net.unixdomain.tmpdir=...`).
 
+### Guion de ensayo (`docs/guion-ensayo.md` y `docs/ensayo.ps1`)
+
+El guion recorre la charla pantalla a pantalla: el minuto previsto, qué enseñar y los comandos exactos del código en vivo y de las demos. También incluye un plan B para cada fallo probable. `docs/ensayo.ps1` define las funciones de PowerShell que usa el guion (`Initialize-Charla`, `Start-Infraestructura`, `Use-Etiqueta`, `Test-Modulo`, `Start-Adopcion`, `Invoke-Adopcion`, etc.). Está guardado en UTF-8 **con BOM**, para que Windows PowerShell 5.1 lea bien los acentos.
+
+El código en vivo se hace en una copia de trabajo aparte, `hexagonal-live`, junto al repositorio (`git worktree`), que salta de etiqueta en etiqueta. El repositorio principal se queda en `main`, porque al hacer checkout de una etiqueta antigua desaparece `docs/`.
+
+**Si cambian las etiquetas, los nombres de los JAR o las rutas de los módulos, revisar `ensayo.ps1` y el guion.**
+
 El cartel de difusión debe guardarse en `docs/banner-charla.png`.
 
 ## Guía de teoría (`docs/guia-teoria-arquitectura-hexagonal.md`)
