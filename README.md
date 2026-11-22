@@ -139,6 +139,15 @@ Con el perfil `in-memory`, la persistencia pasa a `InMemoryLoadPetAdapter` e `In
 java -jar services/adoption-service/boot/target/adoption-service-0.0.1-SNAPSHOT.jar --spring.profiles.active=in-memory
 ```
 
+## Material de la charla
+
+| Fichero | Para qué |
+|---|---|
+| [`docs/charla-arquitectura-hexagonal.html`](docs/charla-arquitectura-hexagonal.html) | La presentación: un único HTML que funciona sin conexión. Flechas para navegar, N para las notas, P para presentar, T para el cronómetro y C para el modo claro u oscuro |
+| [`docs/guia-teoria-arquitectura-hexagonal.md`](docs/guia-teoria-arquitectura-hexagonal.md) | La guía del ponente: cada concepto con la analogía del restaurante y las preguntas difíciles |
+| [`docs/guion-ensayo.md`](docs/guion-ensayo.md) | El guion de ensayo, pantalla a pantalla, con los comandos del código en vivo y qué hacer si algo falla |
+| [`docs/ensayo.ps1`](docs/ensayo.ps1) | Funciones de PowerShell para el ensayo y la charla: `. .\docs\ensayo.ps1` y después `Initialize-Charla` |
+
 ## Ramas
 
 | Rama | Contenido |
@@ -243,7 +252,7 @@ hexagonal-architecture-in-practice/
 ├── services/        Un servicio por carpeta
 │   ├── adoption-service/
 │   └── notification-service/
-└── docs/            Presentación, guía de teoría y cartel
+└── docs/            Presentación, guía de teoría, guion de ensayo y cartel
 ```
 
 ### Módulos de `notification-service`
