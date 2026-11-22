@@ -108,11 +108,12 @@ La columna **Minuto** es el plan acumulado: el cronómetro de la presentación s
 | 5 | `#m1-s4` SOAP captura HTTP | **Pantalla clave.** Abrir `soap/AdoptionEndpoint.java` y leer las líneas del `catch` | |
 | 6 | `#m1-s5` | Pregunta de comprobación (S para la solución) | |
 | 7 | `#m2-s1` a `#m2-s8` | Teoría. Recortables: `#m2-s4` y `#m2-s6`. La clave es `#m2-s7` (regla de dependencias) y `#m2-s8` (módulos) | |
-| 13 | `#m3-s1` Paso 1 | Saltar a la etiqueta y enseñar `Pet.java`. Remarcar `adopt()` y que no hay setters | `Use-Etiqueta 01-domain` |
-| 15 | `#m3-s2` | Ejecutar el test del dominio: unos 10 s, sin Spring | `Test-Modulo services/adoption-service/domain` |
-| 16 | `#m3-s3` Paso 2 | Enseñar el puerto de entrada y `PetService implements AdoptPetUseCase` | `Use-Etiqueta 02-input-port` |
-| 18 | `#m3-s4`, `#m3-s5` Paso 3 | Enseñar `AdoptPetService` (sin `@Service`) y los tres puertos. Ejecutar el test del caso de uso | `Use-Etiqueta 03-output-ports` y `Test-Modulo services/adoption-service/application` |
-| 20 | `#m4-s1` Paso 4 | MongoDB: `MongoPetAdapter` y `PetMongoMapper` | `Use-Etiqueta 04-mongodb-adapter` |
+| 13 | `#m3-s1` Paso 1 | Saltar a la etiqueta y enseñar `Pet.java`. Remarcar que es un **record inmutable**: `adopt()` devuelve otra mascota, no hay setters | `Use-Etiqueta 01-domain` |
+| 14 | `#m3-s2` | Ejecutar el test del dominio, unos 10 s y sin Spring. Señalar `adoptingDoesNotChangeTheOriginalPet` | `Test-Modulo services/adoption-service/domain` |
+| 15 | `#m3-s3` Por qué inmutable | La frase de arriba y una o dos filas de la tabla: nadie se salta la regla, no hay estados a medias | |
+| 16 | `#m3-s4` Paso 2 | Enseñar el puerto de entrada y `PetService implements AdoptPetUseCase` | `Use-Etiqueta 02-input-port` |
+| 18 | `#m3-s5`, `#m3-s6` Paso 3 | Enseñar `AdoptPetService` (sin `@Service`, guarda la mascota que devuelve `adopt()`) y los tres puertos. Ejecutar el test del caso de uso | `Use-Etiqueta 03-output-ports` y `Test-Modulo services/adoption-service/application` |
+| 20 | `#m4-s1` Paso 4 | MongoDB: `MongoLoadPetAdapter` y `MongoSavePetAdapter`, **un puerto cada uno**, y `PetMongoMapper` | `Use-Etiqueta 04-mongodb-adapter` |
 | 22 | `#m4-s2` Paso 5 | RabbitMQ: `RabbitPetAdoptedPublisher`. Outbox en 30 segundos | `Use-Etiqueta 05-rabbitmq-adapter` |
 | 23 | `#m4-s3` Paso 6 | **El paso grande:** enseñar el resumen del diff, el controlador y `UseCaseConfig` | `Show-Paso 06-rest-adapter` y `Use-Etiqueta 06-rest-adapter` |
 | 25 | `#m4-s4` | Recortable: `RestExceptionHandler` | |
@@ -153,7 +154,7 @@ Si sobra tiempo, publica un mensaje roto desde la consola de RabbitMQ:
 
 **Demo opcional: Spring en el dominio no compila, unos 40 segundos.**
 1. Ejecuta `Use-Etiqueta 08-testing`.
-2. Añade a `domain/.../model/Pet.java` la línea `import org.springframework.stereotype.Component;` y la anotación `@Component` encima de `@Getter`.
+2. Añade a `domain/.../model/Pet.java` la línea `import org.springframework.stereotype.Component;` y la anotación `@Component` encima de `public record Pet`.
 3. Ejecuta `Test-Modulo services/adoption-service/domain`. Sale `package org.springframework.stereotype does not exist` y `BUILD FAILURE`.
 4. Deshazlo:
 

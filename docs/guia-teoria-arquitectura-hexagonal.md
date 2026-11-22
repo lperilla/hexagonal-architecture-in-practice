@@ -58,7 +58,7 @@ Un restaurante recibe pedidos por varios canales: **la mesa y el teléfono**. So
 | La ventanilla donde se entregan las comandas | Puerto de entrada | `AdoptPetUseCase` |
 | El camarero de la mesa y la persona que atiende el teléfono | Adaptadores de entrada | `AdoptionController` (REST) y `AdoptionEndpoint` (SOAP) |
 | «Necesito tomates», «necesito avisar de que ha salido un pedido» | Puertos de salida | `LoadPetPort`, `SavePetPort`, `PublishPetAdoptedPort` |
-| El proveedor concreto y el tablón donde se anuncian los pedidos | Adaptadores de salida | `MongoPetAdapter`, `RabbitPetAdoptedPublisher` |
+| El proveedor concreto y el tablón donde se anuncian los pedidos | Adaptadores de salida | `MongoLoadPetAdapter`, `MongoSavePetAdapter`, `RabbitPetAdoptedPublisher` (uno por puerto) |
 | El encargado que decide con qué proveedor se trabaja | Composición | `UseCaseConfig`, en el módulo `boot` |
 | La carta impresa, que se escribe antes de cocinar | Contrato (API first, contract first) | `adoption-api.yaml`, `adoption.wsdl` y `adoption-types.xsd` |
 | El que lee el tablón y llama al repartidor | Otro servicio con su propio adaptador de entrada | `notification-service` y su `PetAdoptedListener` |
@@ -73,25 +73,39 @@ La frase clave: **la cocina dice «necesito tomates», no «necesito ir a tal su
 
 **En el restaurante.** Las recetas y las normas de la casa. Son las mismas aunque cambies de horno o de proveedor.
 
-**En el Petstore.** La clase `Pet` y su método `adopt()`, en el módulo `domain`:
+**En el Petstore.** El record `Pet` y su método `adopt()`, en el módulo `domain`:
 
 ```java
-public PetAdopted adopt(Owner newOwner, Instant adoptedAt) {
-    if (!isAvailable()) {
-        throw new PetNotAvailableException(id);
+public record Pet(PetId id, String name, PetStatus status, Owner owner) {
+
+    public Pet {
+        // ... validaciones, y la invariante: tiene dueño si y solo si está adoptada
     }
-    this.status = PetStatus.ADOPTED;
-    this.owner = newOwner;
-    return new PetAdopted(id, name, newOwner, adoptedAt);
+
+    public Pet adopt(Owner newOwner) {
+        if (!isAvailable()) {
+            throw new PetNotAvailableException(id);
+        }
+        return new Pet(id, name, PetStatus.ADOPTED, newOwner);
+    }
 }
 ```
 
-También son dominio `PetId` y `Owner` (records, objetos valor), `PetStatus`, las excepciones `PetNotAvailableException` y `PetNotFoundException`, y el evento `PetAdopted`. El método devuelve el evento: el hecho «se ha adoptado» lo produce el propio dominio.
+También son dominio `PetId` y `Owner` (objetos valor), `PetStatus`, las excepciones `PetNotAvailableException` y `PetNotFoundException`, y el evento `PetAdopted`, que se crea con `PetAdopted.of(mascotaAdoptada, instante)`. Todo el modelo son **records inmutables**, y el módulo no tiene ninguna dependencia: ni Spring ni Lombok.
 
-**Lombok en el dominio.** Se permite porque solo actúa al compilar: `Pet` usa `@Getter`, `@ToString` y `@EqualsAndHashCode`. Pero **nunca `@Data` ni `@Setter`**: un setter permitiría saltarse la regla. El estado solo cambia en `adopt()`.
+**Por qué el dominio es inmutable.** `adopt()` no cambia la mascota: devuelve otra, ya adoptada. Así:
+- **Nadie se salta la regla.** No hay `setStatus()`: la única forma de obtener una mascota adoptada es `adopt()`.
+- **No hay estados a medias.** El constructor valida todo, o no hay objeto. En la versión con setters, si algo falla entre `setStatus()` y `setOwnerName()`, la mascota queda adoptada y sin dueño.
+- **Sin efectos colaterales.** Quien tiene una mascota sabe que no va a cambiar por debajo. El código se entiende leyendo una línea.
+- **Concurrencia y caché sin miedo.** Se puede compartir entre hilos sin locks. El almacén en memoria la guarda tal cual, sin copias defensivas.
+- **Tests más simples.** Se comparan valores: lo que entra y lo que sale.
+
+El precio es que cada cambio crea un objeto nuevo, y hay que usar el que devuelve `adopt()`, no el original. El test `adoptingDoesNotChangeTheOriginalPet` lo deja claro.
+
+**En el restaurante.** Una receta publicada no se tacha a bolígrafo: si cambia, se imprime la versión nueva. Quien tiene la anterior en la mano sabe exactamente lo que dice.
 
 **Cuéntalo en 30 segundos.**
-> «El dominio es lo que seguiría siendo verdad aunque mañana tiráramos Spring, MongoDB y RabbitMQ. Que una mascota adoptada no se puede volver a adoptar es una regla del negocio, no de la base de datos. Por eso vive en un módulo Maven que no tiene Spring en el classpath, y se prueba en milisegundos.»
+> «El dominio es lo que seguiría siendo verdad aunque mañana tiráramos Spring, MongoDB y RabbitMQ. Que una mascota adoptada no se puede volver a adoptar es una regla del negocio, no de la base de datos. Por eso vive en un módulo Maven sin dependencias, y se prueba en milisegundos. Y es inmutable: un objeto que no puede cambiar no puede quedar en un estado inválido.»
 
 **Confusión típica.** Pensar que el dominio son «las entidades de la base de datos». `PetDocument`, con `@Document` y `@Data`, no es dominio: es cómo se guarda una mascota en MongoDB. `Pet` es qué es una mascota para el negocio.
 
@@ -139,11 +153,11 @@ public AdoptionResult adopt(AdoptPetCommand command) {
     Pet pet = loadPetPort.loadPet(command.petId())
             .orElseThrow(() -> new PetNotFoundException(command.petId()));
 
-    PetAdopted petAdopted = pet.adopt(command.owner(), clock.instant());   // decide el dominio
+    Pet adopted = pet.adopt(command.owner());   // decide el dominio
 
-    savePetPort.savePet(pet);
-    publishPetAdoptedPort.publish(petAdopted);
-    return AdoptionResult.from(pet);
+    savePetPort.savePet(adopted);
+    publishPetAdoptedPort.publish(PetAdopted.of(adopted, clock.instant()));
+    return AdoptionResult.from(adopted);
 }
 ```
 
@@ -253,7 +267,7 @@ Los declara el núcleo y los implementa un adaptador de salida.
 
 ## 6. Adaptadores
 
-**Qué es.** Código que traduce entre una tecnología concreta y un puerto. **Solo traduce**: no contiene reglas de negocio.
+**Qué es.** Código que traduce entre una tecnología concreta y un puerto. **Solo traduce**: no contiene reglas de negocio. Y **cada adaptador implementa un único puerto**: hace una sola cosa, se prueba por separado y se sustituye por separado. ArchUnit lo comprueba en cada build.
 
 **En el restaurante.**
 - Los adaptadores de entrada son el camarero de la mesa y la persona que atiende el teléfono. Cada uno recibe el pedido a su manera y lo convierte en la misma comanda.
@@ -267,9 +281,10 @@ Los declara el núcleo y los implementa un adaptador de salida.
 | `RestExceptionHandler` | `api-rest` | `PetNotFoundException` → 404 y `PetNotAvailableException` → 409, como `ProblemDetail` |
 | `AdoptionEndpoint` | `api-soap` | XML (clases JAXB) ↔ comando |
 | `AdoptionFaultResolver` | `api-soap` | Excepciones de dominio → faults `PetNotFound` y `PetNotAvailable` |
-| `MongoPetAdapter` | `infrastructure` | `Pet` ↔ `PetDocument`, con `PetMongoMapper` |
+| `MongoLoadPetAdapter` | `infrastructure` | Implementa `LoadPetPort`: `PetDocument` → `Pet`, con `PetMongoMapper` |
+| `MongoSavePetAdapter` | `infrastructure` | Implementa `SavePetPort`: `Pet` → `PetDocument`, con `PetMongoMapper` |
 | `RabbitPetAdoptedPublisher` | `infrastructure` | `PetAdopted` → mensaje `pet.adopted` en el exchange `petstore.events` |
-| `InMemoryPetAdapter` | `infrastructure` | Los mismos puertos que Mongo, en memoria (perfil `in-memory`) |
+| `InMemoryLoadPetAdapter` e `InMemorySavePetAdapter` | `infrastructure` | Los mismos puertos que Mongo, uno cada uno, sobre `InMemoryPetStore` (perfil `in-memory`) |
 
 **Cuéntalo en 30 segundos.**
 > «Los adaptadores son traductores. El controlador traduce de HTTP al idioma del negocio, el endpoint SOAP de XML al idioma del negocio, y el adaptador de Mongo del idioma del negocio a documentos. Si un adaptador tiene un if de negocio, ese if está en el sitio equivocado: el camarero no decide si el pescado está fresco.»
@@ -316,11 +331,11 @@ Es la idea más importante de la charla. Si el público se lleva solo una cosa, 
 
 ```text
 En ejecución (quién llama a quién):
-AdoptPetService ──llama──▶ SavePetPort ──▶ MongoPetAdapter
+AdoptPetService ──llama──▶ SavePetPort ──▶ MongoSavePetAdapter
 El control va de dentro hacia fuera.
 
 En el código (quién conoce a quién):
-AdoptPetService ──▶ SavePetPort ◀──implementa── MongoPetAdapter
+AdoptPetService ──▶ SavePetPort ◀──implementa── MongoSavePetAdapter
 La dependencia va de fuera hacia dentro.
 ```
 
@@ -347,7 +362,7 @@ Esto se llama **inversión de dependencias**. En ejecución, el servicio acaba g
 services/adoption-service/   agregador (packaging pom)
 ├── api-contract/    OpenAPI → AdoptionApi y DTOs generados
 ├── soap-contract/   WSDL + XSD → clases JAXB generadas
-├── domain/          sin dependencias (Lombok solo al compilar)
+├── domain/          records inmutables, sin dependencias (ni Spring ni Lombok)
 ├── application/     → domain
 ├── infrastructure/  → domain, application (MongoDB, RabbitMQ, memoria)
 ├── api-rest/        → application, api-contract
@@ -479,7 +494,7 @@ Son independientes y se complementan. En el restaurante, la hexagonal es la dist
 
 ### DDD estratégico, solo dos ideas
 
-- **Lenguaje ubicuo.** El código usa las palabras del negocio. Escribimos `pet.adopt(owner, adoptedAt)` y no `pet.setStatus("ADOPTED")`. Si negocio dice «adoptar», el código dice «adoptar».
+- **Lenguaje ubicuo.** El código usa las palabras del negocio. Escribimos `pet.adopt(owner)` y no `pet.setStatus("ADOPTED")`. Si negocio dice «adoptar», el código dice «adoptar».
 - **Contexto delimitado (bounded context).** Una palabra puede significar cosas distintas en distintas partes del negocio. Se ve ya en el repositorio: para Adopción, una adopción es una mascota con dueño; para Notificaciones, `Adoption` es un aviso pendiente con su clave de idempotencia. Son clases distintas en servicios distintos, y está bien que lo sean.
 
 ### DDD táctico en el Petstore
@@ -504,8 +519,8 @@ No expliques SOLID en abstracto. Señala dónde aparece cada principio en el có
 
 | Principio | Qué dice | En el restaurante | En el Petstore |
 |---|---|---|---|
-| **S**: responsabilidad única | Una clase tiene un solo motivo para cambiar | El camarero no cocina y el cocinero no cobra | `AdoptionController` cambia si cambia la API, `MongoPetAdapter` si cambia la persistencia y `Pet` si cambia la regla |
-| **O**: abierto/cerrado | Se puede extender sin modificar lo que ya funciona | Añadir el teléfono sin reescribir las recetas | El canal SOAP e `InMemoryPetAdapter` se añaden sin tocar `AdoptPetService` |
+| **S**: responsabilidad única | Una clase tiene un solo motivo para cambiar | El camarero no cocina y el cocinero no cobra | `AdoptionController` cambia si cambia la API, `MongoSavePetAdapter` si cambia cómo se guarda y `Pet` si cambia la regla. Por eso cada adaptador implementa un único puerto |
+| **O**: abierto/cerrado | Se puede extender sin modificar lo que ya funciona | Añadir el teléfono sin reescribir las recetas | El canal SOAP y los adaptadores en memoria se añaden sin tocar `AdoptPetService` |
 | **L**: sustitución de Liskov | Cualquier implementación de un contrato debe poder sustituir a otra sin romper nada | Cualquier proveedor de tomates debe traer tomates, no pimientos | `PetPersistenceContract`: el adaptador de Mongo y el de memoria pasan los mismos tests |
 | **I**: segregación de interfaces | Interfaces pequeñas, pensadas para quien las usa | Al repartidor le das la dirección, no la carta entera | `LoadPetPort` y `SavePetPort` están separados |
 | **D**: inversión de dependencias | Lo importante no depende de los detalles; ambos dependen de abstracciones | La cocina fija cómo quiere recibir el género y el proveedor se adapta | El núcleo define `SavePetPort` y Mongo lo implementa |
@@ -573,8 +588,14 @@ Porque entonces el núcleo conoce MongoDB: sus tipos, sus métodos y su paginaci
 **«¿Puedo poner `@Document` o `@Entity` en la clase de dominio y ahorrarme el mapper?»**
 Puedes, y es una decisión pragmática válida en sistemas pequeños. El precio es que el modelo de negocio queda condicionado por la base de datos: constructores vacíos, setters y tipos. Si el dominio es rico, compensa separarlos.
 
-**«¿Lombok en el dominio no es acoplarse a una librería?»**
-Lombok solo actúa al compilar: en el bytecode no queda nada que se ejecute, salvo la anotación `@lombok.Generated`, que ArchUnit permite expresamente. Lo que no se usa es `@Data` ni `@Setter`, porque abrirían la puerta a saltarse la regla.
+**«¿Por qué records y no clases con Lombok en el dominio?»**
+Porque un record es inmutable por diseño: no hay setters que olvidar quitar, y la igualdad, `toString` y los accesores vienen de serie, sin ninguna librería. El dominio queda sin dependencias. Lombok se sigue usando donde no hace daño, en los adaptadores (`@RequiredArgsConstructor`, `@Data` en `PetDocument`) y en el servicio de aplicación.
+
+**«¿Un record no es solo para DTOs? ¿Y la identidad de la entidad?»**
+Un record es una clase inmutable con todos sus campos en el constructor; nada impide que tenga comportamiento, como `adopt()`. La igualdad de un record compara todos los campos: dos «fotos» de Luna, disponible y adoptada, no son iguales, y está bien, porque son estados distintos. La identidad de la entidad es su `PetId`: para saber si son la misma mascota, se comparan los identificadores.
+
+**«¿Por qué un adaptador por puerto? ¿No es más sencillo un `MongoPetAdapter` que cargue y guarde?»**
+Es más corto, pero esa clase tendría dos motivos para cambiar. Con un adaptador por puerto, cada clase hace una sola cosa, se prueba por separado y se puede sustituir por separado; por ejemplo, guardar en otra base de datos sin tocar la carga. ArchUnit lo comprueba en cada build.
 
 **«¿Por qué los puertos de salida están en `domain` y no en `application`?»**
 Es una variante válida. Lo que define la arquitectura es que el núcleo define los puertos con sus propios tipos; si están en un paquete o en otro es una decisión de organización.
@@ -620,7 +641,7 @@ Lo normal con mensajería es «al menos una vez». Por eso el consumidor es idem
 | Puerto de entrada | Lo que la aplicación ofrece | Ventanilla de comandas | `AdoptPetUseCase` |
 | Puerto de salida | Lo que la aplicación necesita | «Necesito tomates» | `SavePetPort` |
 | Adaptador de entrada | Traduce un canal a un caso de uso | La mesa y el teléfono | `AdoptionController`, `AdoptionEndpoint`, `PetAdoptedListener` |
-| Adaptador de salida | Implementa un puerto con tecnología | Proveedor concreto | `MongoPetAdapter`, `RabbitPetAdoptedPublisher` |
+| Adaptador de salida | Implementa un único puerto con tecnología | Proveedor concreto | `MongoSavePetAdapter`, `RabbitPetAdoptedPublisher` |
 | Regla de dependencias | Todo depende del núcleo, nunca al revés | El proveedor se adapta a la cocina | Ningún import de Mongo en el núcleo |
 | Módulos Maven | La regla, vigilada por el compilador | Las puertas del local | `domain` no compila con Spring |
 | Contratos primero | El contrato antes que el código | La carta impresa | OpenAPI, WSDL, XSD y el evento |

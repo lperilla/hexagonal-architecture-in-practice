@@ -495,31 +495,27 @@ public class AdoptionEndpoint {
 }`,
 /* ----- domain ----- */
 domain:`
-@Getter
-@ToString
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Pet {
+public record Pet(PetId id, String name, PetStatus status, Owner owner) {
 
-    @EqualsAndHashCode.Include
-    private final PetId id;
-    private final String name;
-    private PetStatus status;
-    private Owner owner;
+    public Pet {
+        // id y estado obligatorios, nombre no vacío y...
+        if ((status == PetStatus.ADOPTED) != (owner != null)) {
+            throw new IllegalArgumentException("Una mascota tiene dueño si y solo si está adoptada");
+        }
+    }
 
     public static Pet available(PetId id, String name) {
         return new Pet(id, name, PetStatus.AVAILABLE, null);
     }
 
-    public PetAdopted adopt(Owner newOwner, Instant adoptedAt) {
+    public Pet adopt(Owner newOwner) {
         if (!isAvailable()) {
             throw new PetNotAvailableException(id);
         }
-        this.status = PetStatus.ADOPTED;
-        this.owner = newOwner;
-        return new PetAdopted(id, name, newOwner, adoptedAt);
+        return new Pet(id, name, PetStatus.ADOPTED, newOwner);
     }
 
-    // constructor privado con las invariantes, restore(), isAvailable() y getOwner() omitidos
+    // isAvailable() omitido
 }`,
 valueObjects:`
 public record PetId(String value) { /* no puede estar vacío */ }
@@ -527,43 +523,57 @@ public record PetId(String value) { /* no puede estar vacío */ }
 public record Owner(String name) { /* el nombre no puede estar vacío */ }
 
 public record PetAdopted(PetId petId, String petName, Owner owner, Instant adoptedAt) {
+
+    public static PetAdopted of(Pet adoptedPet, Instant adoptedAt) { /* solo si está adoptada */ }
 }`,
 domainTest:`
 class PetTest {
 
     private static final PetId LUNA_ID = new PetId("1");
-    private static final Instant NOW = Instant.parse("2026-12-04T10:15:30Z");
 
     @Test
     void anAvailablePetCanBeAdopted() {
         Pet luna = Pet.available(LUNA_ID, "Luna");
 
-        PetAdopted event = luna.adopt(new Owner("Ana"), NOW);
+        Pet adopted = luna.adopt(new Owner("Ana"));
 
-        assertThat(luna.getStatus()).isEqualTo(PetStatus.ADOPTED);
-        assertThat(event).isEqualTo(new PetAdopted(LUNA_ID, "Luna", new Owner("Ana"), NOW));
+        assertThat(adopted.status()).isEqualTo(PetStatus.ADOPTED);
+        assertThat(adopted.owner()).isEqualTo(new Owner("Ana"));
+    }
+
+    @Test
+    void adoptingDoesNotChangeTheOriginalPet() {
+        Pet luna = Pet.available(LUNA_ID, "Luna");
+
+        luna.adopt(new Owner("Ana"));
+
+        assertThat(luna.isAvailable()).isTrue();
     }
 
     @Test
     void anAdoptedPetCannotBeAdoptedAgain() {
-        Pet luna = Pet.restore(LUNA_ID, "Luna", PetStatus.ADOPTED, new Owner("Ana"));
+        Pet luna = new Pet(LUNA_ID, "Luna", PetStatus.ADOPTED, new Owner("Ana"));
 
-        assertThatThrownBy(() -> luna.adopt(new Owner("Bea"), NOW))
+        assertThatThrownBy(() -> luna.adopt(new Owner("Bea")))
                 .isInstanceOf(PetNotAvailableException.class);
     }
 }`,
 domainPom:`
 <artifactId>domain</artifactId>
+<description>Modelo inmutable (records), reglas, excepciones, eventos y
+             puertos de salida. Java puro: sin dependencias.</description>
 
 <dependencies>
-    <!-- Solo actúa en compilación: no llega al código que se ejecuta -->
-    <dependency>
-        <groupId>org.projectlombok</groupId>
-        <artifactId>lombok</artifactId>
-        <scope>provided</scope>
-    </dependency>
-    <!-- y JUnit y AssertJ para los tests. Nada de Spring -->
+    <!-- Solo JUnit y AssertJ, con scope test. Ni Spring ni Lombok -->
 </dependencies>`,
+mutableVsImmutable:`
+// Rama mvc: cualquiera puede cambiar la mascota, sin regla
+pet.setStatus(PetDocument.ADOPTED);
+pet.setOwnerName(ownerName);
+
+// Rama hexagonal: la única forma de adoptar es la regla,
+// y la mascota original no cambia
+Pet adopted = pet.adopt(new Owner("Ana"));`,
 /* ----- application ----- */
 inPort:`
 public interface AdoptPetUseCase {
@@ -577,7 +587,7 @@ public record AdoptPetCommand(PetId petId, Owner owner) {
 public record AdoptionResult(PetId petId, String petName, PetStatus status, Owner owner) {
 
     public static AdoptionResult from(Pet pet) {
-        return new AdoptionResult(pet.getId(), pet.getName(), pet.getStatus(), pet.getOwner().orElseThrow());
+        return new AdoptionResult(pet.id(), pet.name(), pet.status(), pet.owner());
     }
 }`,
 intermediate:`
@@ -604,11 +614,11 @@ public class AdoptPetService implements AdoptPetUseCase {
         Pet pet = loadPetPort.loadPet(command.petId())
                 .orElseThrow(() -> new PetNotFoundException(command.petId()));
 
-        PetAdopted petAdopted = pet.adopt(command.owner(), clock.instant());
+        Pet adopted = pet.adopt(command.owner());
 
-        savePetPort.savePet(pet);
-        publishPetAdoptedPort.publish(petAdopted);
-        return AdoptionResult.from(pet);
+        savePetPort.savePet(adopted);
+        publishPetAdoptedPort.publish(PetAdopted.of(adopted, clock.instant()));
+        return AdoptionResult.from(adopted);
     }
 }`,
 outPorts:`
@@ -627,7 +637,7 @@ public interface PublishPetAdoptedPort {
 mongo:`
 @Component
 @RequiredArgsConstructor
-public class MongoPetAdapter implements LoadPetPort, SavePetPort {
+public class MongoLoadPetAdapter implements LoadPetPort {
 
     private final SpringDataPetRepository repository;
     private final PetMongoMapper mapper;
@@ -636,6 +646,14 @@ public class MongoPetAdapter implements LoadPetPort, SavePetPort {
     public Optional<Pet> loadPet(PetId petId) {
         return repository.findById(petId.value()).map(mapper::toDomain);
     }
+}
+
+@Component
+@RequiredArgsConstructor
+public class MongoSavePetAdapter implements SavePetPort {
+
+    private final SpringDataPetRepository repository;
+    private final PetMongoMapper mapper;
 
     @Override
     public void savePet(Pet pet) {
@@ -730,14 +748,14 @@ modules:`
 services/adoption-service/   agregador (packaging pom)
 ├── api-contract/    OpenAPI → AdoptionApi y DTOs generados
 ├── soap-contract/   WSDL + XSD → clases JAXB generadas
-├── domain/          Pet, reglas, excepciones, PetAdopted, domain.port
+├── domain/          Pet y sus valores (records inmutables), PetAdopted, domain.port
 ├── application/     AdoptPetUseCase, AdoptPetCommand, AdoptPetService
-├── infrastructure/  mongodb, rabbitmq, inmemory
+├── infrastructure/  mongodb, rabbitmq, inmemory: un adaptador por puerto
 ├── api-rest/        AdoptionController, mapper, RestExceptionHandler
 ├── api-soap/        AdoptionEndpoint, mapper, AdoptionFaultResolver
 └── boot/            arranque y composición: el único JAR ejecutable`,
 deps:`
-domain          ← nada (Lombok solo al compilar)
+domain          ← nada (ni Spring ni Lombok)
 application     → domain
 infrastructure  → domain, application
 api-rest        → application, api-contract
@@ -752,7 +770,7 @@ mongoProfile:`
 @Component
 @Profile("!in-memory")
 @RequiredArgsConstructor
-public class MongoPetAdapter implements LoadPetPort, SavePetPort {
+public class MongoLoadPetAdapter implements LoadPetPort {
 
     private final SpringDataPetRepository repository;
     private final PetMongoMapper mapper;
@@ -761,31 +779,26 @@ public class MongoPetAdapter implements LoadPetPort, SavePetPort {
     public Optional<Pet> loadPet(PetId petId) {
         return repository.findById(petId.value()).map(mapper::toDomain);
     }
+}
 
-    @Override
-    public void savePet(Pet pet) {
-        repository.save(mapper.toDocument(pet));
-    }
-}`,
+// MongoSavePetAdapter: igual, con SavePetPort`,
 inMemory:`
 @Component
 @Profile("in-memory")
-public class InMemoryPetAdapter implements LoadPetPort, SavePetPort {
+@RequiredArgsConstructor
+public class InMemoryLoadPetAdapter implements LoadPetPort {
 
-    private final Map<PetId, Pet> pets = new ConcurrentHashMap<>();
+    private final InMemoryPetStore store;
 
     @Override
     public Optional<Pet> loadPet(PetId petId) {
-        return Optional.ofNullable(pets.get(petId)).map(InMemoryPetAdapter::copy);
+        return store.find(petId);
     }
+}
 
-    @Override
-    public void savePet(Pet pet) {
-        pets.put(pet.getId(), copy(pet));
-    }
-
-    // copy(): Pet.restore(...), para que solo cambie lo que se guarda
-}`,
+// InMemorySavePetAdapter: igual, con SavePetPort.
+// InMemoryPetStore: un Map compartido. Pet es inmutable,
+// así que se guarda tal cual, sin copias defensivas.`,
 useCaseTest:`
 class AdoptPetServiceTest {
 
@@ -814,18 +827,19 @@ class ArchitectureTest {
     @Test
     void theDomainDependsOnNothingButJava() {
         classes().that().resideInAPackage("..adoption.domain..")
-                .should().onlyDependOnClassesThat().resideInAnyPackage("..adoption.domain..", "java..", LOMBOK)
+                .should().onlyDependOnClassesThat().resideInAnyPackage("..adoption.domain..", "java..")
                 .check(CLASSES);
     }
 
     @Test
-    void theGeneratedRestContractIsOnlyUsedByTheRestAdapter() {
-        noClasses().that().resideOutsideOfPackages("..adoption.api.contract..", "..adoption.api.rest..")
-                .should().dependOnClassesThat().resideInAPackage("..adoption.api.contract..")
+    void eachAdapterImplementsASinglePort() {
+        classes().that().resideInAPackage("..adoption.infrastructure..")
+                .should(implementAtMostOnePort())   // cuenta las interfaces de domain.port
                 .check(CLASSES);
     }
 
-    // ... y 6 reglas más: aplicación sin Spring, puertos sin tipos técnicos, adaptadores independientes
+    // ... y 7 reglas más: aplicación sin Spring, puertos sin tipos técnicos,
+    //     código generado confinado, adaptadores independientes
 }`,
 /* ----- notification-service (fase 2) ----- */
 notifListener:`
@@ -1118,19 +1132,19 @@ AdoptionResponse (REST) o  AdoptPetResponse (SOAP)`})}
     <div class="split"><div>${fig(hex('adapters'))}</div><div style="display:grid;gap:14px">
       ${concept('adapter','Adaptador','Código que traduce entre una tecnología y un puerto. Solo traduce: aquí viven los mappers y los modelos técnicos.','Si un adaptador tiene un if de negocio, ese if está en el sitio equivocado.')}
       ${concept('adapter','De entrada','Recibe algo del exterior, lo traduce a un comando y llama al puerto de entrada.','Controlador REST, endpoint SOAP, listener de RabbitMQ, un test.')}
-      ${concept('adapter','De salida','Implementa un puerto de salida con una tecnología.','MongoPetAdapter (Pet ↔ PetDocument), RabbitPetAdoptedPublisher.')}
+      ${concept('adapter','De salida','Implementa <b>un único</b> puerto de salida con una tecnología: hace una sola cosa y se sustituye por separado.','MongoLoadPetAdapter, MongoSavePetAdapter, RabbitPetAdoptedPublisher.')}
     </div></div>`,
     notes:cut('Si vamos tarde, nombrar los adaptadores sobre el diagrama y saltar esta pantalla (ahorra 1 min).') },
   { title:'La regla de dependencias', body:()=>`
     <p class="rule">Las dependencias de código apuntan hacia el núcleo. El dominio no importa clases de infraestructura.</p>
     <div class="grid2"><div>
       ${code({file:'flujo en ejecución', lang:'text', src:`
-AdoptPetService --llama--> SavePetPort --> MongoPetAdapter
+AdoptPetService --llama--> SavePetPort --> MongoSavePetAdapter
 
 El control va de dentro hacia fuera.`})}
     </div><div>
       ${code({file:'dependencia de código', lang:'text', src:`
-AdoptPetService --> SavePetPort <--implementa-- MongoPetAdapter
+AdoptPetService --> SavePetPort <--implementa-- MongoSavePetAdapter
 
 El código depende de dentro.`})}
     </div></div>
@@ -1144,15 +1158,29 @@ El código depende de dentro.`})}
 ]},
 { block:1, title:'Construir el núcleo', min:7, goal:'Dominio, caso de uso y puertos en Java puro: tres etiquetas, dos módulos nuevos.', screens:[
   { title:'Paso 1: el modelo de dominio', live:'01-domain', body:()=>`
-    <div class="split"><div>${code({file:'domain/.../model/Pet.java', src:SRC.domain, hl:[1,16,17,18,22]})}</div>
-    <div>${keys(['La regla vive en adopt(): el comportamiento está junto a los datos.','El estado es un tipo del negocio, PetStatus, no un String.','adopt() devuelve el evento PetAdopted: el hecho lo produce el dominio.','Lombok sí, pero solo @Getter, @ToString y @EqualsAndHashCode: nada de @Data ni @Setter.'])}
-    ${code({file:'domain/.../model/*.java', src:SRC.valueObjects})}</div></div>`,
-    notes:live('rama <code>hexagonal</code>, partir de <code>00-start</code> y llegar a <code>01-domain</code>. El módulo <code>domain</code> nace como subcarpeta de <code>services/adoption-service</code>, junto al proyecto en capas, que sigue funcionando.') + ' Comparar la línea 17 con el if sobre pet.getStatus() del servicio original.' },
+    <div class="split"><div>${code({file:'domain/.../model/Pet.java', src:SRC.domain, hl:[1,5,14,15,18]})}</div>
+    <div>${keys(['Pet es un record inmutable: adopt() no cambia la mascota, devuelve otra ya adoptada.','La regla vive en adopt(), y la invariante en el constructor: no se puede construir una mascota inválida.','El estado es un tipo del negocio, PetStatus, no un String.','Sin setters, sin Spring y sin Lombok: el dominio no depende de nada.'])}
+    ${code({file:'domain/.../*.java', src:SRC.valueObjects})}</div></div>`,
+    notes:live('rama <code>hexagonal</code>, partir de <code>00-start</code> y llegar a <code>01-domain</code>. El módulo <code>domain</code> nace como subcarpeta de <code>services/adoption-service</code>, junto al proyecto en capas, que sigue funcionando.') + ' Comparar la línea 15 con el if sobre pet.getStatus() del servicio original, y la línea 18 con sus dos setters.' },
   { title:'Paso 1: Java puro y un test sin Spring', live:'01-domain', body:()=>`
-    <div class="split"><div>${code({file:'domain/.../model/PetTest.java', src:SRC.domainTest, hl:[10,20,21]})}</div>
+    <div class="split"><div>${code({file:'domain/.../model/PetTest.java', src:SRC.domainTest, hl:[9,19,21,28]})}</div>
     <div>${code({file:'domain/pom.xml (extracto)', lang:'text', src:SRC.domainPom})}
-    ${decision({d:'Lombok en el dominio, pero sin @Data ni @Setter.', why:'Solo actúa al compilar y ahorra código repetitivo sin acoplar nada.', cost:'Los setters permitirían saltarse la regla. Por eso el estado solo cambia en adopt().'})}</div></div>`,
+    <p>El segundo test lo dice todo: después de <code class="i">adopt()</code>, la mascota original sigue disponible. Lo que cambia es lo que se guarda.</p></div></div>`,
     notes:'Demo: ejecutar PetTest. Remarcar el tiempo: sin contexto de Spring. Si alguien importa Spring aquí, no compila: no está en el POM.' },
+  { title:'Por qué el dominio es inmutable', body:()=>`
+    <p class="rule">Un objeto que no puede cambiar no puede quedar en un estado inválido.</p>
+    <div class="split"><div>
+      ${tbl(['Con setters (rama mvc)','Con un record inmutable'],[
+        ['Cualquiera puede hacer <code class="i">setStatus("ADOPTED")</code> y saltarse la regla','La única forma de obtener una mascota adoptada es <code class="i">adopt()</code>'],
+        ['Si algo falla a mitad, el objeto queda con estado nuevo y sin dueño','El constructor valida todo, o no hay objeto'],
+        ['Quien tiene una referencia ve cambios que no ha pedido','Lo que tienes no cambia nunca: se razona leyendo una línea'],
+        ['Para compartirlo entre hilos o cachés hacen falta locks o copias','Se comparte sin miedo: el almacén en memoria guarda la mascota tal cual'],
+        ['Los tests tienen que preparar y comprobar estado mutable','El test compara valores: lo que entra y lo que sale']])}
+    </div><div>
+      ${code({file:'la diferencia, en dos líneas', src:SRC.mutableVsImmutable, hl:[2,3,7]})}
+      ${decision({d:'El modelo de dominio son records inmutables.', why:'Protege la regla, evita estados a medias y simplifica la concurrencia y los tests.', cost:'Cada cambio crea un objeto nuevo, y hay que usar el que devuelve adopt(), no el original. El test adoptingDoesNotChangeTheOriginalPet lo deja claro.'})}
+    </div></div>`,
+    notes:'Pantalla que pidió Peri: el porqué de la inmutabilidad. Si vamos tarde, quedarse con la frase de arriba y la primera fila de la tabla.' },
   { title:'Paso 2: el puerto de entrada', live:'02-input-port', body:()=>`
     <div class="grid2"><div>${code({file:'application/.../port/in/AdoptPetUseCase.java', src:SRC.inPort})}${code({file:'application/.../port/in/*.java', src:SRC.command})}</div>
     <div>${keys(['El puerto de entrada expresa una capacidad del sistema: adoptar.','El comando usa objetos valor del dominio, no el DTO HTTP ni la clase JAXB.','El mismo caso de uso puede invocarse desde REST, SOAP, RabbitMQ o un test.'])}
@@ -1161,7 +1189,7 @@ El código depende de dentro.`})}
     notes:live('de <code>01-domain</code> a <code>02-input-port</code>. Nace el módulo <code>application</code>.') + ' Mensaje: se puede migrar sin parar el servicio.' },
   { title:'Paso 3: el servicio de aplicación', live:'03-output-ports', body:()=>`
     <div class="split"><div>${code({file:'application/.../service/AdoptPetService.java', src:SRC.appService, hl:[1,14,16,17]})}</div>
-    <div>${fig(hex('in'))}<p>Orquesta: cargar, adoptar, guardar, publicar. La decisión la toma el dominio (línea 14). Sin <code class="i">@Service</code>: se registra como bean en <code class="i">boot</code>.</p></div></div>`,
+    <div>${fig(hex('in'))}<p>Orquesta: cargar, adoptar, guardar, publicar. La decisión la toma el dominio (línea 14), y lo que se guarda y se publica es la mascota que devuelve <code class="i">adopt()</code>. Sin <code class="i">@Service</code>: se registra como bean en <code class="i">boot</code>.</p></div></div>`,
     notes:live('de <code>02-input-port</code> a <code>03-output-ports</code>.') + ' Comparar con PetService: mismo flujo, ninguna clase de Spring en el constructor. El Clock también se inyecta: así el test controla el tiempo.' },
   { title:'Paso 3: los puertos de salida', live:'03-output-ports', body:()=>`
     <div class="split"><div>${code({file:'domain/.../port/*.java', src:SRC.outPorts})}
@@ -1173,9 +1201,9 @@ El código depende de dentro.`})}
 ]},
 { block:1, title:'Conectar los adaptadores', min:7, goal:'Reconectar el núcleo con MongoDB, RabbitMQ, REST y SOAP sin cambiar el comportamiento.', screens:[
   { title:'Paso 4: adaptador de MongoDB', live:'04-mongodb-adapter', body:()=>`
-    <div class="split"><div>${code({file:'infrastructure/.../mongodb/MongoPetAdapter.java', src:SRC.mongo, hl:[3,10,15]})}</div>
-    <div>${keys(['Un mismo adaptador implementa dos puertos: cargar y guardar.','PetDocument vive aquí y no sale de aquí. Puede llevar @Data.','PetMongoMapper traduce Pet ↔ PetDocument: es el precio explícito de separar modelo y persistencia.'])}</div></div>`,
-    notes:live('de <code>03-output-ports</code> a <code>04-mongodb-adapter</code>. Nace <code>infrastructure</code>.') + ' El documento conserva la forma de los datos de la rama mvc (colección pets).' },
+    <div class="split"><div>${code({file:'infrastructure/.../mongodb/Mongo{Load,Save}PetAdapter.java', src:SRC.mongo, hl:[3,10,16,23]})}</div>
+    <div>${keys(['Un adaptador, un puerto: MongoLoadPetAdapter solo carga y MongoSavePetAdapter solo guarda.','Cada uno hace una sola cosa, se prueba y se sustituye por separado. ArchUnit lo comprueba.','PetDocument vive aquí y no sale de aquí. Puede llevar @Data: es un modelo técnico, no el de negocio.','PetMongoMapper traduce Pet ↔ PetDocument: es el precio explícito de separar modelo y persistencia.'])}</div></div>`,
+    notes:live('de <code>03-output-ports</code> a <code>04-mongodb-adapter</code>. Nace <code>infrastructure</code>.') + ' El documento conserva la forma de los datos de la rama mvc (colección pets). Si preguntan por qué no un solo adaptador con los dos puertos: porque cada clase tendría dos motivos para cambiar.' },
   { title:'Paso 5: adaptador de RabbitMQ', live:'05-rabbitmq-adapter', body:()=>`
     <div class="split"><div>${code({file:'infrastructure/.../rabbitmq/RabbitPetAdoptedPublisher.java', src:SRC.rabbit, hl:[3,9,11]})}</div>
     <div>${decision({d:'Publicar en RabbitMQ justo después de guardar, sin outbox.', why:'Es lo más simple para la demo y mantiene el foco en los límites.', cost:'Si MongoDB confirma y RabbitMQ falla, el evento se pierde. En producción: Transactional Outbox.'})}
@@ -1234,9 +1262,9 @@ El código depende de dentro.`})}
     notes:'El endpoint hexagonal no captura nada: traduce y llama. Los faults los resuelve AdoptionFaultResolver a partir de excepciones de dominio.' },
   { title:'Pieza a pieza', body:()=>`
     ${tbl(['Pieza','mvc','hexagonal'],[
-      ['Regla de negocio','PetService compara un String del documento','Pet.adopt() en domain'],
+      ['Regla de negocio','PetService compara un String del documento y lo cambia con setters','Pet.adopt() en domain: un record inmutable que devuelve una mascota nueva'],
       ['Errores','ResponseStatusException; SOAP traduce códigos HTTP','Excepciones de dominio, traducidas en api-rest y en api-soap'],
-      ['Persistencia','El documento con @Data es el modelo de negocio','LoadPetPort y SavePetPort: MongoDB o memoria'],
+      ['Persistencia','El documento con @Data es el modelo de negocio','LoadPetPort y SavePetPort, un adaptador cada uno: MongoDB o memoria'],
       ['Evento','RabbitTemplate en el servicio','PublishPetAdoptedPort'],
       ['Composición','@Service y escaneo','AdoptPetService sin anotaciones, registrado en boot'],
       ['Notificaciones','El servicio recibe el mensaje, usa JavaMailSender y consulta el perfil','Listener como adaptador de entrada; SMTP y log, dos adaptadores'],
@@ -1268,25 +1296,26 @@ El código depende de dentro.`})}
       ${good(1,'Contratos antes que código','el contrato es la fuente de verdad y se puede revisar antes de programar.','OpenAPI, WSDL y XSD, y el evento en contracts/events, en las dos ramas.')}
       ${good(2,'Un solo sitio para traducir cada canal','los errores se ven igual vengan de donde vengan.','RestExceptionHandler y AdoptionFaultResolver.')}
       ${good(3,'Composición explícita','el núcleo no depende del framework.','AdoptPetService sin @Service, registrado en boot.')}
+      ${good(4,'Un dominio inmutable','nadie se salta la regla ni deja estados a medias.','Pet es un record: adopt() devuelve una mascota nueva.')}
     </div><div>
-      ${good(4,'Tests que no conocen la implementación','prueban el comportamiento, no la estructura.','los tests de extremo a extremo son el mismo fichero en mvc y hexagonal y pasan en cada etiqueta.')}
-      ${good(5,'Consumidores tolerantes','el productor puede evolucionar sin romper a nadie.','clase propia, ignorar campos desconocidos, sin __TypeId__, DLQ.')}
-      ${good(6,'Idempotencia en los consumidores','los mensajes pueden llegar dos veces.','NotifiedAdoptionsPort: un email por adopción.')}
+      ${good(5,'Un adaptador, un puerto','cada clase hace una sola cosa y se sustituye por separado.','MongoLoadPetAdapter y MongoSavePetAdapter; ArchUnit lo comprueba.')}
+      ${good(6,'Tests que no conocen la implementación','prueban el comportamiento, no la estructura.','los tests de extremo a extremo son el mismo fichero en mvc y hexagonal y pasan en cada etiqueta.')}
+      ${good(7,'Consumidores tolerantes e idempotentes','el productor puede evolucionar y los mensajes pueden llegar dos veces.','clase propia, campos desconocidos ignorados, DLQ y un email por adopción.')}
     </div></div>`,
-    notes:'Mismo formato que los errores, en positivo. Cada práctica señala dónde está en el repositorio.' },
+    notes:'Mismo formato que los errores, en positivo. Cada práctica señala dónde está en el repositorio. Las 4 y 5 son las que más se discuten: inmutabilidad y un puerto por adaptador.' },
   { title:'Que la arquitectura se compruebe sola', body:()=>`
     <div class="split"><div>${code({file:'boot/.../ArchitectureTest.java', src:SRC.archunit, hl:[9,10,16,17]})}</div>
     <div><p class="lead">Dos defensas que se complementan:</p>
-    ${keys(['<b>Maven</b>: si domain no declara Spring, importar Spring no compila.','<b>ArchUnit</b>: lo que Maven no ve. Que los puertos no usen tipos técnicos, que el código generado no salga de su adaptador y que los adaptadores no se conozcan.'])}</div></div>`,
+    ${keys(['<b>Maven</b>: si domain no declara Spring, importar Spring no compila.','<b>ArchUnit</b>: lo que Maven no ve. Que los puertos no usen tipos técnicos, que el código generado no salga de su adaptador, que los adaptadores no se conozcan y que cada adaptador implemente un único puerto.'])}</div></div>`,
     notes:'La corrección del error 1, en código. Si da tiempo, enseñar en vivo el error de compilación al importar @Component en Pet.' }
 ]},
 
 /* ===================== Bloque 3 ===================== */
 { block:3, title:'Ventajas que se pueden demostrar', min:4, goal:'Demostrar el aislamiento, no limitarse a afirmarlo.', screens:[
   { title:'Cambiar MongoDB por memoria', live:'08-testing', body:()=>`
-    ${beforeAfter({file:'MongoPetAdapter.java', src:SRC.mongoProfile, hl:[2]}, {file:'InMemoryPetAdapter.java', src:SRC.inMemory, hl:[2]}, 'Perfil por defecto','Perfil in-memory')}
-    ${keys(['El dominio, el caso de uso y los contratos REST y SOAP no cambian.','Cambian la configuración y el adaptador seleccionado.'])}`,
-    notes:live('arrancar con <code>--spring.profiles.active=in-memory</code> y lanzar el mismo POST. Mismo resultado, sin MongoDB.') + ' Los dos adaptadores pasan el mismo contrato de tests: PetPersistenceContract.' },
+    ${beforeAfter({file:'MongoLoadPetAdapter.java', src:SRC.mongoProfile, hl:[2,4]}, {file:'InMemoryLoadPetAdapter.java', src:SRC.inMemory, hl:[2,4]}, 'Perfil por defecto','Perfil in-memory')}
+    ${keys(['El dominio, el caso de uso y los contratos REST y SOAP no cambian.','Cambian la configuración y los adaptadores seleccionados: uno por puerto, en las dos versiones.','Como Pet es inmutable, el almacén en memoria la guarda tal cual, sin copias defensivas.'])}`,
+    notes:live('arrancar con <code>--spring.profiles.active=in-memory</code> y lanzar el mismo POST. Mismo resultado, sin MongoDB.') + ' Las dos parejas de adaptadores pasan el mismo contrato de tests: PetPersistenceContract.' },
   { title:'Testing por capas', body:()=>`
     <div class="split"><div>${code({file:'application/.../AdoptPetServiceTest.java', src:SRC.useCaseTest, hl:[3,5,6]})}</div>
     <div class="pyramid">
@@ -1312,9 +1341,9 @@ El código depende de dentro.`})}
     notes:'Anécdota útil: el XSD se llama adoption-types.xsd porque Spring WS no publica un WSDL y un XSD con el mismo nombre. Los contratos también tienen restricciones técnicas.' },
   { title:'Decisiones de diseño', body:()=>`
     ${tbl(['Decisión','Por qué'],[
-      ['Sin @Data ni @Setter en el dominio','Los setters saltarían la regla; Lombok solo donde no hace daño'],
+      ['Dominio con records inmutables','Adoptar devuelve una mascota nueva: nadie se salta la regla ni deja estados a medias'],
       ['Puertos sin detalles técnicos','Los tipos son de dominio: Pet, no PetDocument ni DTOs'],
-      ['LoadPetPort y SavePetPort separados','Cada uso pide solo lo que necesita'],
+      ['LoadPetPort y SavePetPort separados, un adaptador por puerto','Cada uso pide solo lo que necesita y cada adaptador hace una sola cosa (ArchUnit lo comprueba)'],
       ['Puertos de salida en domain','Variante válida: lo importante es que los define el núcleo'],
       ['Publicación sin outbox en la demo','Foco en los límites; en producción, outbox'],
       ['Servicio de aplicación sin @Service','El núcleo no depende de Spring; se compone en boot'],
@@ -1336,8 +1365,8 @@ El código depende de dentro.`})}
       ${concept('domain','DDD','Decide cómo modelar el negocio dentro de esa frontera, con el lenguaje de los expertos.','¿Qué conceptos y reglas tiene el negocio? Pet es la raíz de su agregado; PetId y Owner, objetos valor; PetAdopted, un evento.')}
     </div>
     ${tbl(['Principio SOLID','Dónde lo hemos visto'],[
-      ['S: responsabilidad única','AdoptionController cambia si cambia la API; MongoPetAdapter, si cambia la persistencia; Pet, si cambia la regla'],
-      ['O: abierto/cerrado','InMemoryPetAdapter y el canal SOAP se añaden sin tocar AdoptPetService'],
+      ['S: responsabilidad única','AdoptionController cambia si cambia la API; MongoSavePetAdapter, si cambia cómo se guarda; Pet, si cambia la regla'],
+      ['O: abierto/cerrado','Los adaptadores en memoria y el canal SOAP se añaden sin tocar AdoptPetService'],
       ['L: sustitución de Liskov','PetPersistenceContract: Mongo y memoria pasan los mismos tests'],
       ['I: segregación de interfaces','LoadPetPort y SavePetPort separados'],
       ['D: inversión de dependencias','El núcleo define SavePetPort y el adaptador la implementa']])}`,
