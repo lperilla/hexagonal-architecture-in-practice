@@ -491,7 +491,7 @@ Guía del ponente. Usa la analogía del restaurante: recetas como dominio, jefe 
 
 ## Entorno de Peri
 
-Windows con PowerShell y VS Code. Red corporativa con Zscaler y VPN GlobalProtect, que a veces provocan errores TLS con Git, Maven y Podman. En Podman, el certificado raíz corporativo debe instalarse dentro de la máquina virtual de Podman, no solo en Windows. Si una descarga, una imagen o un push fallan por certificados, sospecha primero del proxy.
+Windows con PowerShell y VS Code. Red corporativa con un proxy TLS y una VPN, que a veces provocan errores TLS con Git, Maven y Podman. En Podman, el certificado raíz corporativo debe instalarse dentro de la máquina virtual de Podman, no solo en Windows. Si una descarga, una imagen o un push fallan por certificados, sospecha primero del proxy.
 
 Problemas encontrados en las fases 0 a 2 y cómo se resolvieron:
 
