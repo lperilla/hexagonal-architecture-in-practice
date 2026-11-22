@@ -3,33 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arquitectura hexagonal con Java y Spring Boot: Petstore</title>
+<title>Arquitectura hexagonal en la práctica</title>
 <style>
+/* Identidad visual del cartel: oscuro por defecto (verde petróleo, núcleo naranja, hexágonos
+   turquesa, texto crema). El modo claro conserva los mismos tonos (tecla C). */
 :root{
-  color-scheme: light;
-  --bg:#F2F4F1; --surface:#FFFFFF; --surface-2:#E9EDEA; --ink:#1B2A31; --muted:#56676E; --line:#D3DBD6;
-  --domain:#2E6B4E; --domain-soft:#E0EDE5;
-  --app:#3B5BA5;    --app-soft:#E3E9F6;
-  --adapter:#9A6410; --adapter-soft:#F4E9D3;
-  --risk:#A8323F;   --risk-soft:#F6E2E4;
-  --code-bg:#1D2A30; --code-ink:#E2E9EC; --code-muted:#7D9098; --code-hl:#2B3D45;
+  color-scheme: dark;
+  --bg:#0E1A1E; --surface:#13242A; --surface-2:#1A3038; --ink:#F3EEE3; --muted:#A7B7B4; --line:#28434C;
+  --domain:#F47A20; --domain-soft:#3A2416;
+  --app:#E9B949;    --app-soft:#352E1A;
+  --adapter:#2EC4B6; --adapter-soft:#123735;
+  --good:#2EC4B6;   --good-soft:#123735;
+  --risk:#F07167;   --risk-soft:#3C2023;
+  --code-bg:#091316; --code-ink:#E2E9EC; --code-muted:#7D9098; --code-hl:#18303A;
   --tk-kw:#F0A86B; --tk-str:#A8D49A; --tk-ann:#E7C46B; --tk-type:#8FC1F0; --tk-com:#7D9098; --tk-num:#D9A0E0;
-  --focus:#3B5BA5;
+  --focus:#2EC4B6; --on-primary:#0E1A1E;
   --serif:"Charter","Bitstream Charter","Sitka Text",Cambria,Georgia,serif;
   --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
   --mono:"JetBrains Mono","Cascadia Code",Consolas,"SF Mono",Menlo,monospace;
 }
-@media (prefers-color-scheme: dark){
-  :root{
-    color-scheme: dark;
-    --bg:#131A1D; --surface:#1A2428; --surface-2:#212D32; --ink:#E3EAEC; --muted:#9AAAB1; --line:#2E3C42;
-    --domain:#74C49A; --domain-soft:#1E3328;
-    --app:#93ABEA;    --app-soft:#212C44;
-    --adapter:#E2AB4C; --adapter-soft:#372C17;
-    --risk:#E8828E;   --risk-soft:#3A2226;
-    --code-bg:#0E1518; --code-hl:#1F2E34;
-    --focus:#93ABEA;
-  }
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#F6F1E7; --surface:#FFFFFF; --surface-2:#EEE6D7; --ink:#0E1A1E; --muted:#4D5F64; --line:#DDD3C2;
+  --domain:#C55A0E; --domain-soft:#FBE4D2;
+  --app:#8A6A12;    --app-soft:#F5EBCB;
+  --adapter:#11796F; --adapter-soft:#D4F0EC;
+  --good:#11796F;   --good-soft:#D4F0EC;
+  --risk:#B3343F;   --risk-soft:#F6DFE1;
+  --code-bg:#1D2A30; --code-hl:#2B3D45;
+  --focus:#11796F; --on-primary:#FFFFFF;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -63,12 +65,14 @@ button:disabled{cursor:not-allowed; opacity:.45}
 .tool.late{border-color:var(--risk); color:var(--risk)}
 
 /* ---------- Estructura ---------- */
-.frame{display:grid; grid-template-columns:290px 1fr; min-height:0}
-.nav{border-right:1px solid var(--line); background:var(--surface); padding:18px 12px; overflow-y:auto}
+.frame{display:grid; grid-template-columns:300px 1fr; min-height:0}
+.nav{border-right:1px solid var(--line); background:var(--surface); padding:14px 12px; overflow-y:auto}
 .nav ol{list-style:none; margin:0; padding:0}
+.nav li.blk{margin:14px 10px 4px; font-size:.72rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--adapter)}
+.nav li.blk:first-child{margin-top:2px}
 .nav li button{
   width:100%; text-align:left; display:grid; grid-template-columns:26px 1fr; gap:10px; align-items:start;
-  background:transparent; border:0; border-radius:8px; padding:9px 10px; line-height:1.3;
+  background:transparent; border:0; border-radius:8px; padding:8px 10px; line-height:1.3;
 }
 .nav li button:hover{background:var(--surface-2)}
 .nav .dot{
@@ -80,27 +84,28 @@ button:disabled{cursor:not-allowed; opacity:.45}
 .nav [data-state="current"]{background:var(--app-soft)}
 .nav [data-state="current"] .dot{border-color:var(--app); color:var(--app)}
 .nav [data-state="current"] .t{font-weight:600}
-.nav [data-state="done"] .dot{background:var(--domain); border-color:var(--domain); color:var(--surface)}
+.nav [data-state="done"] .dot{background:var(--domain); border-color:var(--domain); color:var(--on-primary)}
 .nav [data-state="done"] .t{color:var(--muted)}
 .nav .legend{margin:18px 10px 0; font-size:.75rem; color:var(--muted); line-height:1.6}
 
-.stage{overflow-y:auto; padding:34px 48px 60px}
+.stage{overflow-y:auto; padding:30px 48px 60px}
 .screen{max-width:1120px; margin:0 auto}
 .screen.enter{animation:enter .22s ease-out}
 @keyframes enter{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
 @media (prefers-reduced-motion: reduce){ .screen.enter{animation:none} .bar i{transition:none} }
 
 .modhead{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; color:var(--muted); font-size:.9rem; margin-bottom:4px}
-.modhead b{color:var(--ink); font-weight:600}
+.modhead b{color:var(--adapter); font-weight:700; letter-spacing:.02em}
 h2{font-family:var(--serif); font-weight:600; font-size:2.2rem; line-height:1.15; margin:0 0 6px; letter-spacing:-.01em}
-.goal{color:var(--muted); margin:0 0 26px; max-width:70ch}
-h3{font-family:var(--serif); font-weight:600; font-size:1.3rem; margin:28px 0 10px}
+.goal{color:var(--muted); margin:0 0 24px; max-width:70ch}
+h3{font-family:var(--serif); font-weight:600; font-size:1.3rem; margin:26px 0 10px}
 p{max-width:72ch}
 .lead{font-size:1.12rem}
 .grid2{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:22px; align-items:start}
 .grid3{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; align-items:start}
 .split{display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:28px; align-items:start}
 code.i{font-family:var(--mono); font-size:.88em; background:var(--surface-2); padding:1px 5px; border-radius:4px}
+.live{display:inline-block; background:var(--domain); color:var(--on-primary); border-radius:4px; padding:1px 8px; font-size:.78rem; font-weight:700; letter-spacing:.02em}
 
 /* ---------- Componentes ---------- */
 .concept{background:var(--surface); border:1px solid var(--line); border-left:5px solid var(--c); border-radius:4px 10px 10px 4px; padding:16px 18px}
@@ -109,17 +114,20 @@ code.i{font-family:var(--mono); font-size:.88em; background:var(--surface-2); pa
 .concept .ex{font-size:.88rem; color:var(--muted)}
 .c-domain{--c:var(--domain)} .c-app{--c:var(--app)} .c-adapter{--c:var(--adapter)}
 
-.code{background:var(--code-bg); color:var(--code-ink); border-radius:10px; overflow:hidden; font-size:.86rem; margin:0 0 18px}
+.code{background:var(--code-bg); color:var(--code-ink); border-radius:10px; overflow:hidden; font-size:.84rem; margin:0 0 18px; border:1px solid #ffffff10}
 .code header{display:flex; justify-content:space-between; gap:12px; padding:8px 14px; font-family:var(--mono); font-size:.78rem; color:var(--code-muted); border-bottom:1px solid #ffffff14}
 .code pre{margin:0; padding:10px 0; overflow-x:auto; font-family:var(--mono); line-height:1.55}
-.code .ln{display:block; padding:0 16px 0 0; border-left:3px solid transparent}
+/* Cada línea es una rejilla: número y texto. Las líneas largas se parten dentro del panel en lugar
+   de obligar a desplazarse en horizontal durante la charla. */
+.code .ln{display:grid; grid-template-columns:3.2em minmax(0,1fr); padding:0 14px 0 0; border-left:3px solid transparent}
 .code .ln.hl{background:var(--code-hl); border-left-color:var(--tk-ann)}
-.code .n{display:inline-block; width:3.2em; text-align:right; padding-right:1.1em; color:var(--code-muted); user-select:none}
+.code .n{text-align:right; padding-right:1.1em; color:var(--code-muted); user-select:none}
+.code .tx{white-space:pre-wrap; overflow-wrap:anywhere}
 .tk-kw{color:var(--tk-kw)} .tk-str{color:var(--tk-str)} .tk-ann{color:var(--tk-ann)} .tk-type{color:var(--tk-type)} .tk-com{color:var(--tk-com); font-style:italic} .tk-num{color:var(--tk-num)}
 
 .ba{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px}
 .ba .tag{font-size:.85rem; font-weight:600; margin:0 0 6px}
-.ba .before .tag{color:var(--risk)} .ba .after .tag{color:var(--domain)}
+.ba .before .tag{color:var(--risk)} .ba .after .tag{color:var(--good)}
 
 .decision{border:1px solid var(--app); border-radius:12px; background:var(--app-soft); padding:4px 0; margin:0 0 18px}
 .decision div{display:grid; grid-template-columns:130px 1fr; gap:14px; padding:10px 18px}
@@ -139,9 +147,10 @@ code.i{font-family:var(--mono); font-size:.88em; background:var(--surface-2); pa
 .mistake{display:grid; grid-template-columns:44px 1fr; gap:14px; padding:14px 0; border-top:1px solid var(--line)}
 .mistake:first-child{border-top:0}
 .mistake .num{width:36px; height:36px; border-radius:50%; background:var(--risk-soft); color:var(--risk); display:grid; place-items:center; font-weight:700}
+.mistake.good .num{background:var(--good-soft); color:var(--good)}
 .mistake h4{margin:2px 0 4px; font-size:1.05rem}
 .mistake p{margin:0; font-size:.95rem}
-.mistake .fix{color:var(--domain)}
+.mistake .fix{color:var(--good)}
 .mistake .fix b, .mistake .eff b{font-weight:600}
 
 .keys{list-style:none; padding:0; margin:0 0 18px}
@@ -160,14 +169,15 @@ code.i{font-family:var(--mono); font-size:.88em; background:var(--surface-2); pa
 .pyramid small{display:block; color:var(--muted); font-size:.8rem}
 
 .hero{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:36px; align-items:center; margin-top:10px}
-.hero h2{font-size:2.7rem; line-height:1.07; letter-spacing:-.02em}
-.hero .sub{font-size:1.25rem; color:var(--muted); margin:14px 0 0}
+.hero h2{font-size:3rem; line-height:1.05; letter-spacing:-.02em; margin-top:14px}
+.hero .sub{font-size:1.5rem; color:var(--domain); font-family:var(--serif); margin:6px 0 22px}
+.agenda{list-style:none; counter-reset:blk; padding:0; margin:0 0 18px}
+.agenda li{counter-increment:blk; display:grid; grid-template-columns:40px 1fr; column-gap:12px; padding:9px 0; border-top:1px solid var(--line)}
+.agenda li::before{content:counter(blk); grid-row:1/3; width:32px; height:32px; border-radius:50%; border:2px solid var(--adapter); color:var(--adapter); display:grid; place-items:center; font-weight:700}
+.agenda b{font-size:1.08rem}
+.agenda span{color:var(--muted); font-size:.92rem}
+.stackline{color:var(--muted); font-size:.85rem; margin:0}
 .big-q{font-family:var(--serif); font-size:2.6rem; line-height:1.2; max-width:24ch; margin:40px 0 20px; letter-spacing:-.01em}
-
-.scope h4{margin:0 0 6px; font-size:1rem}
-.scope ul{margin:0; padding-left:1.1em}
-.scope .out h4{color:var(--muted)}
-
 
 .tblwrap{overflow-x:auto; margin:0 0 18px; border:1px solid var(--line); border-radius:10px; background:var(--surface)}
 .tbl{width:100%; border-collapse:collapse; font-size:.93rem}
@@ -179,32 +189,34 @@ code.i{font-family:var(--mono); font-size:.88em; background:var(--surface-2); pa
 .foot .grp{display:flex; gap:10px; align-items:center}
 .btn{border:1px solid var(--line); background:var(--surface); border-radius:8px; padding:9px 18px; font-weight:600}
 .btn:hover:not(:disabled){background:var(--surface-2)}
-.btn.primary{background:var(--app); border-color:var(--app); color:#fff}
+.btn.primary{background:var(--app); border-color:var(--app); color:var(--on-primary)}
 .btn.primary:hover:not(:disabled){filter:brightness(1.08); background:var(--app)}
-@media (prefers-color-scheme: dark){ .btn.primary{color:#0E1518} }
 .kbd{font-size:.78rem; color:var(--muted)}
 
-.notes{position:fixed; left:0; right:0; bottom:0; z-index:6; background:var(--surface); border-top:2px solid var(--adapter); padding:16px 26px 22px; max-height:40vh; overflow-y:auto; box-shadow:0 -8px 24px #0002; display:none}
+.notes{position:fixed; left:0; right:0; bottom:0; z-index:6; background:var(--surface); border-top:2px solid var(--domain); padding:16px 26px 22px; max-height:40vh; overflow-y:auto; box-shadow:0 -8px 24px #0006; display:none}
 .notes.open{display:block}
-.notes h4{margin:0 0 6px; color:var(--adapter)}
+.notes h4{margin:0 0 6px; color:var(--domain)}
 .notes p{margin:0 0 6px}
-.cut{display:inline-block; background:var(--adapter-soft); color:var(--adapter); border-radius:4px; padding:1px 8px; font-size:.82rem; font-weight:600}
+.cut{display:inline-block; background:var(--app-soft); color:var(--app); border-radius:4px; padding:1px 8px; font-size:.82rem; font-weight:600}
 
 /* ---------- Modo presentación ---------- */
 body.presenting .frame{grid-template-columns:1fr}
 body.presenting .nav{display:none}
 body.presenting{font-size:19px}
-body.presenting .stage{padding:40px 64px 60px}
+body.presenting .stage{padding:30px 56px 50px}
+body.presenting .code{font-size:.76rem}
+body.presenting .screen{max-width:1400px}
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1000px){
   .frame{grid-template-columns:1fr}
   .nav{border-right:0; border-bottom:1px solid var(--line); padding:8px}
   .nav ol{display:flex; overflow-x:auto; gap:4px}
+  .nav li.blk{display:none}
   .nav li button{grid-template-columns:24px auto; white-space:nowrap}
   .nav .m, .nav .legend{display:none}
   .grid2,.grid3,.split,.ba,.hero{grid-template-columns:1fr}
-  .stage{padding:22px 18px 50px}
+  .stage{padding:22px 16px 50px}
   .hero h2{font-size:2.2rem}
   h2{font-size:1.7rem}
   .big-q{font-size:1.8rem}
@@ -222,8 +234,8 @@ body.presenting .stage{padding:40px 64px 60px}
 
 <header class="top">
   <div class="brand">
-    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><polygon points="28,15 21.5,26.3 8.5,26.3 2,15 8.5,3.7 21.5,3.7" fill="none" stroke="var(--app)" stroke-width="2"/><polygon points="20,15 17.5,19.3 12.5,19.3 10,15 12.5,10.7 17.5,10.7" fill="var(--domain)"/></svg>
-    <div><h1>Arquitectura hexagonal con Java y Spring Boot</h1><small>4 de diciembre de 2026, 50 minutos y 10 de preguntas</small></div>
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><polygon points="28,15 21.5,26.3 8.5,26.3 2,15 8.5,3.7 21.5,3.7" fill="none" stroke="var(--adapter)" stroke-width="2"/><polygon points="20,15 17.5,19.3 12.5,19.3 10,15 12.5,10.7 17.5,10.7" fill="var(--domain)"/></svg>
+    <div><h1>Arquitectura hexagonal en la práctica</h1><small>Del diseño al código · 4 de diciembre de 2026 · 50 minutos y 10 de preguntas</small></div>
   </div>
   <div class="progress" aria-live="polite">
     <div class="bar" role="progressbar" aria-label="Progreso del recorrido" aria-valuemin="0" aria-valuemax="100" id="bar"><i></i></div>
@@ -232,14 +244,15 @@ body.presenting .stage{padding:40px 64px 60px}
   <div class="tools">
     <button class="tool" id="timer" title="Cronómetro de ensayo (T)">Iniciar cronómetro</button>
     <button class="tool opt" id="notesBtn" title="Notas del ponente (N)">Notas</button>
+    <button class="tool opt" id="themeBtn" title="Modo claro u oscuro (C)">Modo claro</button>
     <button class="tool" id="presentBtn" title="Modo presentación (P)">Presentar</button>
   </div>
 </header>
 
 <div class="frame">
-  <nav class="nav" aria-label="Módulos de la charla">
+  <nav class="nav" aria-label="Bloques y módulos de la charla">
     <ol id="navList"></ol>
-    <p class="legend">Flechas o mando: avanzar y retroceder<br>S: ver solución<br>N: notas<br>P: presentar<br>T: cronómetro</p>
+    <p class="legend">Flechas o mando: avanzar y retroceder<br>S: ver solución<br>N: notas<br>P: presentar<br>T: cronómetro<br>C: modo claro u oscuro</p>
   </nav>
   <main class="stage" id="stage"><div class="screen" id="screen"></div></main>
 </div>
@@ -257,7 +270,7 @@ body.presenting .stage{padding:40px 64px 60px}
    ========================================================= */
 const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-const JAVA_RE = /(\/\/.*$)|("(?:[^"\\]|\\.)*")|(@[A-Za-z]+)|\b(public|private|protected|final|class|interface|record|static|return|new|if|else|throw|throws|void|int|boolean|implements|extends|import|package|this|null|true|false|var|for|try|catch)\b|\b([A-Z][A-Za-z0-9_]*)\b|\b(\d+)\b/g;
+const JAVA_RE = /(\/\/.*$)|("(?:[^"\\]|\\.)*")|(@[A-Za-z]+)|\b(public|private|protected|final|class|interface|record|static|return|new|if|else|throw|throws|void|int|boolean|implements|extends|import|package|this|null|true|false|var|for|try|catch|switch|case|default)\b|\b([A-Z][A-Za-z0-9_]*)\b|\b(\d+)\b/g;
 function hlLine(line, lang){
   if (lang === 'java'){
     let out = '', last = 0;
@@ -269,7 +282,7 @@ function hlLine(line, lang){
     });
     return out + esc(line.slice(last));
   }
-  if (lang === 'bash'){
+  if (lang === 'bash' || lang === 'yaml'){
     const i = line.indexOf('#');
     return i >= 0 ? esc(line.slice(0,i)) + `<span class="tk-com">${esc(line.slice(i))}</span>` : esc(line);
   }
@@ -280,11 +293,11 @@ function hlLine(line, lang){
 function code({file, lang='java', src, hl=[]}){
   const lines = src.replace(/^\n/,'').replace(/\s+$/,'').split('\n');
   const body = lines.map((l,i) =>
-    `<span class="ln${hl.includes(i+1)?' hl':''}"><span class="n">${i+1}</span>${hlLine(l, lang) || ' '}</span>`).join('');
+    `<span class="ln${hl.includes(i+1)?' hl':''}"><span class="n">${i+1}</span><span class="tx">${hlLine(l, lang) || ' '}</span></span>`).join('');
   return `<figure class="code" aria-label="Código de ${esc(file)}"><header><span>${esc(file)}</span><span>${lang}</span></header><pre><code>${body}</code></pre></figure>`;
 }
-/** ConceptCard: definición corta y ejemplo */
 const tbl = (head, rows) => `<div class="tblwrap"><table class="tbl"><thead><tr>${head.map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+/** ConceptCard: definición corta y ejemplo */
 const concept = (layer, term, def, ex) =>
   `<article class="concept c-${layer}"><h4>${term}</h4><p>${def}</p><p class="ex">${ex}</p></article>`;
 /** DecisionCard: decisión, motivo y trade-off */
@@ -296,28 +309,34 @@ const check = (q, a, hint='Pensadlo unos segundos antes de ver la solución.') =
 /** CommonMistake: error, efecto y corrección */
 const mistake = (n, title, eff, fix) =>
   `<article class="mistake"><span class="num">${n}</span><div><h4>${title}</h4><p class="eff"><b>Efecto:</b> ${eff}</p><p class="fix"><b>Corrección:</b> ${fix}</p></div></article>`;
+/** GoodPractice: práctica, motivo y dónde está en el código */
+const good = (n, title, why, where) =>
+  `<article class="mistake good"><span class="num">${n}</span><div><h4>${title}</h4><p class="eff"><b>Por qué:</b> ${why}</p><p class="fix"><b>En el código:</b> ${where}</p></div></article>`;
 /** BeforeAfter */
 const beforeAfter = (before, after, tb='Antes', ta='Después') =>
   `<div class="ba"><div class="before"><p class="tag">${tb}</p>${code(before)}</div><div class="after"><p class="tag">${ta}</p>${code(after)}</div></div>`;
 const keys = arr => `<ul class="keys">${arr.map(k=>`<li>${k}</li>`).join('')}</ul>`;
 const fig = (svg, cap) => `<figure class="figure">${svg}${cap?`<figcaption>${cap}</figcaption>`:''}</figure>`;
+/** Marca de código en vivo para las notas del ponente */
+const live = where => `<span class="live">En vivo</span> ${where}`;
+const cut = saving => `<span class="cut">Recortable</span> ${saving}`;
 
 /* ---------- ArchitectureDiagram: hexágono que evoluciona ---------- */
 function hex(stage='map'){
   const cx=320, cy=200;
   const pts = r => [0,60,120,180,240,300].map(a=>{const t=a*Math.PI/180;return `${(cx+r*Math.cos(t)).toFixed(1)},${(cy+r*Math.sin(t)).toFixed(1)}`}).join(' ');
   const focus = {
-    map:['domain','app','in','out','adL','mongo','kafka'], domain:['domain'], in:['app','in','domain'],
-    out:['app','out'], adapters:['adL','mongo','kafka','in','out'], swap:['mongo'],
-    test:['adL','mongo','kafka','app','domain','in','out']
+    map:['domain','app','in','out','rest','soap','mongo','rabbit'], domain:['domain'], in:['app','in','domain'],
+    out:['app','out'], adapters:['rest','soap','mongo','rabbit','in','out'], swap:['mongo'],
+    test:['rest','mongo','rabbit','app','domain','in','out'], soap:['rest','soap','in','app']
   }[stage];
   const op = g => focus.includes(g) ? 1 : (stage==='swap' ? .55 : .26);
-  const hot = g => (stage==='swap' && g==='mongo') || (stage==='test' && ['adL','mongo','kafka'].includes(g));
+  const hot = g => (stage==='swap' && g==='mongo') || (stage==='test' && ['rest','mongo','rabbit'].includes(g)) || (stage==='soap' && g==='soap');
   const port = (label,x,y) => `<g opacity="${op('out')}"><rect x="${x-52}" y="${y-12}" width="104" height="24" rx="12" fill="var(--surface)" stroke="var(--app)" stroke-width="1.6"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="12" fill="var(--app)">${label}</text></g>`;
   const box = (label,x,y1,h,g,sub) => `<g opacity="${op(g)}"><rect x="${x}" y="${y1}" width="104" height="${h}" rx="5" fill="var(--adapter-soft)" stroke="var(--adapter)" stroke-width="${hot(g)?2.4:1.4}" ${hot(g)?'stroke-dasharray="5 3"':''}/><text x="${x+52}" y="${y1+h/2+(sub?-2:5)}" text-anchor="middle" font-size="13" fill="var(--ink)">${label}</text>${sub?`<text x="${x+52}" y="${y1+h/2+16}" text-anchor="middle" font-size="10" fill="var(--muted)">${sub}</text>`:''}</g>`;
   const arrow = (x1,y1,x2,y2,g) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--ink)" stroke-width="1.6" marker-end="url(#ah)" opacity="${op(g)}"/>`;
   const store = stage==='swap' || stage==='test' ? 'En memoria' : 'MongoDB';
-  const bus = stage==='test' ? 'Fake eventos' : 'Kafka';
+  const bus = stage==='test' ? 'Publicador fake' : 'RabbitMQ';
   return `<svg viewBox="0 0 640 400" role="img" aria-label="Diagrama hexagonal: adaptadores fuera, puertos en el borde, aplicación y dominio dentro">
     <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--ink)"/></marker></defs>
     <g opacity="${op('app')}"><polygon points="${pts(150)}" fill="var(--app-soft)" stroke="var(--app)" stroke-width="2"/>
@@ -326,93 +345,162 @@ function hex(stage='map'){
     <g opacity="${op('domain')}"><polygon points="${pts(72)}" fill="var(--domain-soft)" stroke="var(--domain)" stroke-width="2"/>
       <text x="${cx}" y="197" text-anchor="middle" font-size="15" font-weight="600" fill="var(--domain)">Dominio</text>
       <text x="${cx}" y="215" text-anchor="middle" font-size="11" fill="var(--muted)">Pet</text></g>
-    <g opacity="${op('in')}"><rect x="118" y="188" width="104" height="24" rx="12" fill="var(--surface)" stroke="var(--app)" stroke-width="1.6"/><text x="170" y="204" text-anchor="middle" font-size="12" fill="var(--app)">Adoptar mascota</text></g>
+    <g opacity="${op('in')}"><rect x="128" y="188" width="104" height="24" rx="12" fill="var(--surface)" stroke="var(--app)" stroke-width="1.6"/><text x="180" y="204" text-anchor="middle" font-size="12" fill="var(--app)">Adoptar mascota</text></g>
     ${port('Cargar mascota',432,135)}${port('Guardar mascota',470,200)}${port('Publicar evento',432,265)}
-    ${box(stage==='test'?'Test JUnit':'REST',0,182,36,'adL')}
-    ${arrow(104,200,116,200,'adL')}
+    ${box(stage==='test'?'Test JUnit':'REST',0,146,36,'rest')}
+    ${box('SOAP',0,218,36,'soap')}
+    ${arrow(104,164,126,193,'rest')}${arrow(104,236,126,207,'soap')}
     ${box(store,534,112,110,'mongo', stage==='swap'?'antes: MongoDB':'')}
-    ${box(bus,534,247,36,'kafka')}
-    ${arrow(534,135,486,135,'mongo')}${arrow(534,200,524,200,'mongo')}${arrow(534,265,486,265,'kafka')}
+    ${box(bus,534,247,36,'rabbit')}
+    ${arrow(534,135,486,135,'mongo')}${arrow(534,200,524,200,'mongo')}${arrow(534,265,486,265,'rabbit')}
   </svg>`;
 }
 
-/* ---------- Diagrama de la versión acoplada ---------- */
+/* ---------- Módulos Maven colocados sobre el hexágono ---------- */
+function modulesFig(){
+  const cx=320, cy=180;
+  const pts = r => [0,60,120,180,240,300].map(a=>{const t=a*Math.PI/180;return `${(cx+r*Math.cos(t)).toFixed(1)},${(cy+r*Math.sin(t)).toFixed(1)}`}).join(' ');
+  const mod = (x,y,w,h,label,subs,c) => `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="var(--${c}-soft)" stroke="var(--${c})" stroke-width="1.5"/>
+    <text x="${x+w/2}" y="${subs.length?y+21:y+h/2+5}" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">${label}</text>
+    ${subs.map((s,i)=>`<text x="${x+w/2}" y="${y+38+i*15}" text-anchor="middle" font-size="10.5" fill="var(--muted)">${s}</text>`).join('')}</g>`;
+  const gen = (x,y,label) => `<g><rect x="${x}" y="${y}" width="130" height="26" rx="13" fill="var(--surface)" stroke="var(--adapter)" stroke-dasharray="4 3"/><text x="${x+65}" y="${y+17}" text-anchor="middle" font-size="11" fill="var(--adapter)">${label}</text></g>`;
+  const arrow = (x1,y1,x2,y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--ink)" stroke-width="1.6" marker-end="url(#am)"/>`;
+  return `<svg viewBox="0 0 640 400" role="img" aria-label="Módulos Maven de adoption-service sobre el hexágono: las dependencias apuntan hacia el núcleo">
+    <defs><marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--ink)"/></marker></defs>
+    <polygon points="${pts(132)}" fill="var(--app-soft)" stroke="var(--app)" stroke-width="2"/>
+    <text x="${cx}" y="${cy-86}" text-anchor="middle" font-size="15" font-weight="600" fill="var(--app)">application</text>
+    <text x="${cx}" y="${cy-69}" text-anchor="middle" font-size="10.5" fill="var(--muted)">AdoptPetUseCase · AdoptPetService</text>
+    <polygon points="${pts(64)}" fill="var(--domain-soft)" stroke="var(--domain)" stroke-width="2"/>
+    <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="15" font-weight="600" fill="var(--domain)">domain</text>
+    <text x="${cx}" y="${cy+15}" text-anchor="middle" font-size="10.5" fill="var(--muted)">Pet · domain.port</text>
+    ${mod(8,82,130,58,'api-rest',['controlador, errores'],'adapter')}${gen(8,146,'api-contract (OpenAPI)')}
+    ${mod(8,196,130,58,'api-soap',['endpoint, faults'],'adapter')}${gen(8,260,'soap-contract (JAXB)')}
+    ${mod(502,96,130,166,'infrastructure',['mongodb','rabbitmq','inmemory'],'adapter')}
+    ${arrow(138,111,194,145)}${arrow(138,225,194,205)}${arrow(502,180,454,180)}
+    <rect x="118" y="336" width="404" height="46" rx="6" fill="var(--surface-2)" stroke="var(--line)"/>
+    <text x="320" y="356" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">boot</text>
+    <text x="320" y="372" text-anchor="middle" font-size="10.5" fill="var(--muted)">arranque y composición · depende de todos · único JAR ejecutable</text>
+  </svg>`;
+}
+
+/* ---------- Diagrama de la versión acoplada (rama mvc) ---------- */
 function coupled(){
   const chip = (x,y,w,label,c) => `<rect x="${x}" y="${y}" width="${w}" height="26" rx="13" fill="var(--${c}-soft)" stroke="var(--${c})"/><text x="${x+w/2}" y="${y+17}" text-anchor="middle" font-size="11.5" fill="var(--ink)">${label}</text>`;
   const ext = (y,label) => `<rect x="500" y="${y-20}" width="130" height="40" rx="5" fill="var(--surface-2)" stroke="var(--line)"/><text x="565" y="${y+4}" text-anchor="middle" font-size="12" fill="var(--ink)">${label}</text><line x1="440" y1="${y}" x2="496" y2="${y}" stroke="var(--risk)" stroke-width="1.8" marker-end="url(#ar)"/>`;
-  return `<svg viewBox="0 0 640 270" role="img" aria-label="El servicio central depende directamente de MongoDB, Kafka y HTTP">
+  const entry = (y,name,sub,subColor) => `<rect x="10" y="${y}" width="150" height="50" rx="5" fill="var(--surface-2)" stroke="var(--line)"/><text x="85" y="${y+21}" text-anchor="middle" font-size="12" fill="var(--ink)">${name}</text><text x="85" y="${y+38}" text-anchor="middle" font-size="10.5" fill="var(--${subColor})">${sub}</text>`;
+  return `<svg viewBox="0 0 640 280" role="img" aria-label="El servicio central depende directamente de MongoDB, RabbitMQ y HTTP; el endpoint SOAP tiene que traducir excepciones HTTP">
     <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--risk)"/></marker></defs>
-    <rect x="10" y="110" width="140" height="50" rx="5" fill="var(--surface-2)" stroke="var(--line)"/>
-    <text x="80" y="131" text-anchor="middle" font-size="12" fill="var(--ink)">PetController</text><text x="80" y="148" text-anchor="middle" font-size="10.5" fill="var(--muted)">POST (HTTP)</text>
-    <line x1="150" y1="135" x2="196" y2="135" stroke="var(--ink)" stroke-width="1.6" marker-end="url(#ar)"/>
-    <rect x="200" y="30" width="240" height="210" rx="10" fill="var(--risk-soft)" stroke="var(--risk)" stroke-width="2"/>
-    <text x="320" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--risk)">PetService</text>
-    ${chip(222,76,196,'Regla: mascota disponible','domain')}
-    ${chip(222,112,196,'PetDocument (Mongo)','adapter')}
-    ${chip(222,148,196,'ResponseStatusException (HTTP)','adapter')}
-    ${chip(222,184,196,'KafkaTemplate','adapter')}
-    ${ext(100,'MongoDB')}${ext(175,'Kafka')}
+    ${entry(50,'AdoptionController','REST (HTTP)','muted')}
+    ${entry(170,'AdoptionEndpoint','SOAP: captura HTTP','risk')}
+    <line x1="160" y1="75" x2="196" y2="100" stroke="var(--ink)" stroke-width="1.6" marker-end="url(#ar)"/>
+    <line x1="160" y1="195" x2="196" y2="170" stroke="var(--ink)" stroke-width="1.6" marker-end="url(#ar)"/>
+    <rect x="200" y="22" width="240" height="236" rx="10" fill="var(--risk-soft)" stroke="var(--risk)" stroke-width="2"/>
+    <text x="320" y="48" text-anchor="middle" font-size="14" font-weight="600" fill="var(--risk)">PetService</text>
+    ${chip(222,68,196,'Regla: compara un String','domain')}
+    ${chip(222,106,196,'PetDocument (@Data, MongoDB)','adapter')}
+    ${chip(222,144,196,'ResponseStatusException (HTTP)','adapter')}
+    ${chip(222,182,196,'RabbitTemplate','adapter')}
+    ${ext(119,'MongoDB')}${ext(195,'RabbitMQ')}
   </svg>`;
 }
 
 /* =========================================================
-   Código del caso práctico: adoptar una mascota
+   Código del caso práctico: el código real del repositorio
+   (si cambia el código, actualizar aquí en el mismo commit)
    ========================================================= */
 const SRC = {
+/* ----- Rama mvc (etiqueta 00-start) ----- */
 controller0:`
 @RestController
-@RequestMapping("/pets")
 @RequiredArgsConstructor
-public class PetController {
+public class AdoptionController implements AdoptionApi {
 
     private final PetService petService;
 
-    @PostMapping("/{petId}/adoption")
-    public PetResponse adopt(@PathVariable String petId,
-                             @RequestBody AdoptPetRequest request) {
-        return petService.adopt(petId, request);
+    @Override
+    public ResponseEntity<AdoptionResponse> adoptPet(String petId, AdoptionRequest adoptionRequest) {
+        PetDocument pet = petService.adopt(petId, adoptionRequest.getOwnerName());
+        return ResponseEntity.ok(new AdoptionResponse(
+                pet.getId(), pet.getName(), PetStatus.fromValue(pet.getStatus()), pet.getOwnerName()));
     }
 }`,
 document0:`
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Document("pets")
 public class PetDocument {
+
+    public static final String AVAILABLE = "AVAILABLE";
+    public static final String ADOPTED = "ADOPTED";
+
     @Id
     private String id;
     private String name;
     private String status;
     private String ownerName;
 }`,
-repo0:`
-public interface PetMongoRepository
-        extends MongoRepository<PetDocument, String> {
-}`,
 service0:`
 @Service
 @RequiredArgsConstructor
 public class PetService {
 
-    private final PetMongoRepository repository;
-    private final KafkaTemplate<String, PetAdoptedEvent> kafkaTemplate;
+    private final PetRepository petRepository;
+    private final RabbitTemplate rabbitTemplate;
 
-    public PetResponse adopt(String petId, AdoptPetRequest request) {
-        PetDocument pet = repository.findById(petId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!"AVAILABLE".equals(pet.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Pet not available");
+    public PetDocument adopt(String petId, String ownerName) {
+        PetDocument pet = petRepository.findById(petId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "La mascota " + petId + " no existe"));
+
+        if (!PetDocument.AVAILABLE.equals(pet.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "La mascota " + petId + " no está disponible para adopción");
         }
 
-        pet.setStatus("ADOPTED");
-        pet.setOwnerName(request.ownerName());
-        PetDocument saved = repository.save(pet);
-        kafkaTemplate.send("pet-adopted",
-                new PetAdoptedEvent(saved.getId(), saved.getOwnerName()));
-        return new PetResponse(saved.getId(), saved.getName(), saved.getStatus());
+        pet.setStatus(PetDocument.ADOPTED);
+        pet.setOwnerName(ownerName);
+        PetDocument adopted = petRepository.save(pet);
+
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, RabbitConfig.PET_ADOPTED_ROUTING_KEY,
+                new PetAdoptedMessage(adopted.getId(), adopted.getName(), adopted.getOwnerName(), Instant.now()));
+        return adopted;
     }
 }`,
-domain:`
-public final class Pet {
+soap0:`
+@Endpoint
+@RequiredArgsConstructor
+public class AdoptionEndpoint {
 
+    private final PetService petService;
+
+    @PayloadRoot(namespace = NAMESPACE, localPart = "AdoptPetRequest")
+    @ResponsePayload
+    public AdoptPetResponse adoptPet(@RequestPayload AdoptPetRequest request) {
+        try {
+            PetDocument pet = petService.adopt(request.getPetId(), request.getOwnerName());
+            // ... copiar PetDocument en AdoptPetResponse
+            return response;
+        } catch (ResponseStatusException e) {
+            // El servicio solo sabe responder con códigos HTTP: hay que traducirlos a faults SOAP
+            if (e.getStatusCode().isSameCodeAs(HttpStatus.NOT_FOUND)) {
+                throw AdoptionFaultException.petNotFound(request.getPetId(), e.getReason());
+            }
+            if (e.getStatusCode().isSameCodeAs(HttpStatus.CONFLICT)) {
+                throw AdoptionFaultException.petNotAvailable(request.getPetId(), e.getReason());
+            }
+            throw e;
+        }
+    }
+}`,
+/* ----- domain ----- */
+domain:`
+@Getter
+@ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class Pet {
+
+    @EqualsAndHashCode.Include
     private final PetId id;
     private final String name;
     private PetStatus status;
@@ -422,325 +510,550 @@ public final class Pet {
         return new Pet(id, name, PetStatus.AVAILABLE, null);
     }
 
-    public void adopt(Owner newOwner) {
-        if (status != PetStatus.AVAILABLE) {
+    public PetAdopted adopt(Owner newOwner, Instant adoptedAt) {
+        if (!isAvailable()) {
             throw new PetNotAvailableException(id);
         }
         this.status = PetStatus.ADOPTED;
         this.owner = newOwner;
+        return new PetAdopted(id, name, newOwner, adoptedAt);
     }
 
-    // constructor privado y accesores omitidos
+    // constructor privado con las invariantes, restore(), isAvailable() y getOwner() omitidos
+}`,
+valueObjects:`
+public record PetId(String value) { /* no puede estar vacío */ }
+
+public record Owner(String name) { /* el nombre no puede estar vacío */ }
+
+public record PetAdopted(PetId petId, String petName, Owner owner, Instant adoptedAt) {
 }`,
 domainTest:`
 class PetTest {
 
+    private static final PetId LUNA_ID = new PetId("1");
+    private static final Instant NOW = Instant.parse("2026-12-04T10:15:30Z");
+
     @Test
-    void adopting_an_available_pet_marks_it_as_adopted() {
-        Pet luna = Pet.available(new PetId("1"), "Luna");
+    void anAvailablePetCanBeAdopted() {
+        Pet luna = Pet.available(LUNA_ID, "Luna");
 
-        luna.adopt(new Owner("Ana"));
+        PetAdopted event = luna.adopt(new Owner("Ana"), NOW);
 
-        assertThat(luna.status()).isEqualTo(PetStatus.ADOPTED);
+        assertThat(luna.getStatus()).isEqualTo(PetStatus.ADOPTED);
+        assertThat(event).isEqualTo(new PetAdopted(LUNA_ID, "Luna", new Owner("Ana"), NOW));
     }
 
     @Test
-    void a_pet_cannot_be_adopted_twice() {
-        Pet luna = Pet.available(new PetId("1"), "Luna");
-        luna.adopt(new Owner("Ana"));
+    void anAdoptedPetCannotBeAdoptedAgain() {
+        Pet luna = Pet.restore(LUNA_ID, "Luna", PetStatus.ADOPTED, new Owner("Ana"));
 
-        assertThatThrownBy(() -> luna.adopt(new Owner("Luis")))
-            .isInstanceOf(PetNotAvailableException.class);
+        assertThatThrownBy(() -> luna.adopt(new Owner("Bea"), NOW))
+                .isInstanceOf(PetNotAvailableException.class);
     }
 }`,
+domainPom:`
+<artifactId>domain</artifactId>
+
+<dependencies>
+    <!-- Solo actúa en compilación: no llega al código que se ejecuta -->
+    <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <scope>provided</scope>
+    </dependency>
+    <!-- y JUnit y AssertJ para los tests. Nada de Spring -->
+</dependencies>`,
+/* ----- application ----- */
 inPort:`
 public interface AdoptPetUseCase {
+
     AdoptionResult adopt(AdoptPetCommand command);
 }`,
 command:`
-public record AdoptPetCommand(String petId, String ownerName) {
+public record AdoptPetCommand(PetId petId, Owner owner) {
+}
+
+public record AdoptionResult(PetId petId, String petName, PetStatus status, Owner owner) {
+
+    public static AdoptionResult from(Pet pet) {
+        return new AdoptionResult(pet.getId(), pet.getName(), pet.getStatus(), pet.getOwner().orElseThrow());
+    }
+}`,
+intermediate:`
+@Service
+@RequiredArgsConstructor
+public class PetService implements AdoptPetUseCase {
+
+    @Override
+    public AdoptionResult adopt(AdoptPetCommand command) {
+        // ... el mismo código acoplado de siempre
+    }
 }`,
 appService:`
-public final class AdoptPetService implements AdoptPetUseCase {
+@RequiredArgsConstructor
+public class AdoptPetService implements AdoptPetUseCase {
 
     private final LoadPetPort loadPetPort;
     private final SavePetPort savePetPort;
     private final PublishPetAdoptedPort publishPetAdoptedPort;
-
-    public AdoptPetService(LoadPetPort load, SavePetPort save,
-                           PublishPetAdoptedPort publish) {
-        this.loadPetPort = load;
-        this.savePetPort = save;
-        this.publishPetAdoptedPort = publish;
-    }
+    private final Clock clock;
 
     @Override
     public AdoptionResult adopt(AdoptPetCommand command) {
-        Pet pet = loadPetPort.load(new PetId(command.petId()))
+        Pet pet = loadPetPort.loadPet(command.petId())
                 .orElseThrow(() -> new PetNotFoundException(command.petId()));
 
-        pet.adopt(new Owner(command.ownerName()));
+        PetAdopted petAdopted = pet.adopt(command.owner(), clock.instant());
 
-        savePetPort.save(pet);
-        publishPetAdoptedPort.publish(PetAdopted.from(pet));
+        savePetPort.savePet(pet);
+        publishPetAdoptedPort.publish(petAdopted);
         return AdoptionResult.from(pet);
     }
 }`,
 outPorts:`
 public interface LoadPetPort {
-    Optional<Pet> load(PetId id);
+    Optional<Pet> loadPet(PetId petId);
 }
 
 public interface SavePetPort {
-    void save(Pet pet);
+    void savePet(Pet pet);
 }
 
 public interface PublishPetAdoptedPort {
     void publish(PetAdopted event);
 }`,
+/* ----- infrastructure ----- */
+mongo:`
+@Component
+@RequiredArgsConstructor
+public class MongoPetAdapter implements LoadPetPort, SavePetPort {
+
+    private final SpringDataPetRepository repository;
+    private final PetMongoMapper mapper;
+
+    @Override
+    public Optional<Pet> loadPet(PetId petId) {
+        return repository.findById(petId.value()).map(mapper::toDomain);
+    }
+
+    @Override
+    public void savePet(Pet pet) {
+        repository.save(mapper.toDocument(pet));
+    }
+}`,
+rabbit:`
+@Component
+@RequiredArgsConstructor
+public class RabbitPetAdoptedPublisher implements PublishPetAdoptedPort {
+
+    private final RabbitTemplate rabbitTemplate;
+
+    @Override
+    public void publish(PetAdopted event) {
+        PetAdoptedMessage message = new PetAdoptedMessage(
+                event.petId().value(), event.petName(), event.owner().name(), event.adoptedAt());
+        rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, RabbitConfig.PET_ADOPTED_ROUTING_KEY, message);
+    }
+}`,
+/* ----- api-rest y api-soap ----- */
 rest:`
 @RestController
-@RequestMapping("/pets")
 @RequiredArgsConstructor
-class PetRestController {
+public class AdoptionController implements AdoptionApi {
 
-    private final AdoptPetUseCase adoptPet;
+    private final AdoptPetUseCase adoptPetUseCase;
+    private final AdoptionRestMapper mapper;
 
-    @PostMapping("/{petId}/adoption")
-    AdoptionResponse adopt(@PathVariable String petId,
-                           @Valid @RequestBody AdoptPetRequest request) {
-        AdoptionResult result =
-                adoptPet.adopt(new AdoptPetCommand(petId, request.ownerName()));
-        return AdoptionResponse.from(result);
+    @Override
+    public ResponseEntity<AdoptionResponse> adoptPet(String petId, AdoptionRequest adoptionRequest) {
+        var result = adoptPetUseCase.adopt(mapper.toCommand(petId, adoptionRequest));
+        return ResponseEntity.ok(mapper.toResponse(result));
     }
 }`,
 advice:`
 @RestControllerAdvice
-class PetErrorHandler {
+class RestExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(PetNotFoundException.class)
-    ProblemDetail notFound(PetNotFoundException ex) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    ProblemDetail petNotFound(PetNotFoundException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
     }
 
     @ExceptionHandler(PetNotAvailableException.class)
-    ProblemDetail notAvailable(PetNotAvailableException ex) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    ProblemDetail petNotAvailable(PetNotAvailableException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
     }
 }`,
-mongo:`
-@Component
+soap:`
+@Endpoint
 @RequiredArgsConstructor
-class MongoPetAdapter implements LoadPetPort, SavePetPort {
+public class AdoptionEndpoint {
 
-    private final SpringDataPetRepository repository;
-    private final PetMongoMapper mapper;
+    private final AdoptPetUseCase adoptPetUseCase;
+    private final AdoptionSoapMapper mapper;
 
-    @Override
-    public Optional<Pet> load(PetId id) {
-        return repository.findById(id.value()).map(mapper::toDomain);
-    }
-
-    @Override
-    public void save(Pet pet) {
-        repository.save(mapper.toDocument(pet));
+    @PayloadRoot(namespace = NAMESPACE, localPart = "AdoptPetRequest")
+    @ResponsePayload
+    public AdoptPetResponse adoptPet(@RequestPayload AdoptPetRequest request) {
+        var result = adoptPetUseCase.adopt(mapper.toCommand(request));
+        return mapper.toResponse(result);
     }
 }`,
-kafka:`
-@Component
-@RequiredArgsConstructor
-class KafkaPetAdoptedAdapter implements PublishPetAdoptedPort {
-
-    private final KafkaTemplate<String, PetAdoptedMessage> kafkaTemplate;
-
-    @Override
-    public void publish(PetAdopted event) {
-        kafkaTemplate.send("pet-adopted", event.petId().value(),
-                new PetAdoptedMessage(event.petId().value(), event.ownerName()));
-    }
+faults:`
+@Override
+protected void customizeFault(Object endpoint, Exception ex, SoapFault fault) {
+    JAXBElement<AdoptionFault> detail = switch (ex) {
+        case PetNotFoundException e -> FACTORY.createPetNotFoundFault(fault(e.getPetId(), e.getMessage()));
+        case PetNotAvailableException e -> FACTORY.createPetNotAvailableFault(fault(e.getPetId(), e.getMessage()));
+        default -> throw new IllegalStateException("Excepción sin fault SOAP: " + ex);
+    };
+    marshaller.marshal(detail, fault.addFaultDetail().getResult());
 }`,
-structure:`
-petstore/adoption/
-  domain/
-    model/
-    exception/
-  application/
-    port/in/
-    port/out/
-    service/
-  adapter/
-    in/rest/
-    out/mongodb/
-    out/kafka/
-  configuration/`,
+/* ----- boot ----- */
 config:`
 @Configuration
-class AdoptionConfiguration {
+public class UseCaseConfig {
 
     @Bean
-    AdoptPetUseCase adoptPetUseCase(LoadPetPort load,
-                                    SavePetPort save,
-                                    PublishPetAdoptedPort publish) {
-        return new AdoptPetService(load, save, publish);
+    public Clock clock() {
+        return Clock.systemUTC();
+    }
+
+    @Bean
+    public AdoptPetUseCase adoptPetUseCase(LoadPetPort loadPetPort, SavePetPort savePetPort,
+                                           PublishPetAdoptedPort publishPetAdoptedPort, Clock clock) {
+        return new AdoptPetService(loadPetPort, savePetPort, publishPetAdoptedPort, clock);
     }
 }`,
+modules:`
+services/adoption-service/   agregador (packaging pom)
+├── api-contract/    OpenAPI → AdoptionApi y DTOs generados
+├── soap-contract/   WSDL + XSD → clases JAXB generadas
+├── domain/          Pet, reglas, excepciones, PetAdopted, domain.port
+├── application/     AdoptPetUseCase, AdoptPetCommand, AdoptPetService
+├── infrastructure/  mongodb, rabbitmq, inmemory
+├── api-rest/        AdoptionController, mapper, RestExceptionHandler
+├── api-soap/        AdoptionEndpoint, mapper, AdoptionFaultResolver
+└── boot/            arranque y composición: el único JAR ejecutable`,
+deps:`
+domain          ← nada (Lombok solo al compilar)
+application     → domain
+infrastructure  → domain, application
+api-rest        → application, api-contract
+api-soap        → application, soap-contract
+boot            → todos
+
+Spring en domain = error de compilación:
+  package org.springframework.stereotype
+  does not exist`,
+/* ----- 08-testing ----- */
 mongoProfile:`
 @Component
 @Profile("!in-memory")
 @RequiredArgsConstructor
-class MongoPetAdapter implements LoadPetPort, SavePetPort {
+public class MongoPetAdapter implements LoadPetPort, SavePetPort {
 
     private final SpringDataPetRepository repository;
     private final PetMongoMapper mapper;
 
     @Override
-    public Optional<Pet> load(PetId id) {
-        return repository.findById(id.value()).map(mapper::toDomain);
+    public Optional<Pet> loadPet(PetId petId) {
+        return repository.findById(petId.value()).map(mapper::toDomain);
     }
 
     @Override
-    public void save(Pet pet) {
+    public void savePet(Pet pet) {
         repository.save(mapper.toDocument(pet));
     }
 }`,
 inMemory:`
 @Component
 @Profile("in-memory")
-class InMemoryPetAdapter implements LoadPetPort, SavePetPort {
+public class InMemoryPetAdapter implements LoadPetPort, SavePetPort {
 
-    private final Map<PetId, Pet> pets = new HashMap<>();
+    private final Map<PetId, Pet> pets = new ConcurrentHashMap<>();
 
     @Override
-    public Optional<Pet> load(PetId id) {
-        return Optional.ofNullable(pets.get(id));
+    public Optional<Pet> loadPet(PetId petId) {
+        return Optional.ofNullable(pets.get(petId)).map(InMemoryPetAdapter::copy);
     }
 
     @Override
-    public void save(Pet pet) {
-        pets.put(pet.id(), pet);
+    public void savePet(Pet pet) {
+        pets.put(pet.getId(), copy(pet));
     }
+
+    // copy(): Pet.restore(...), para que solo cambie lo que se guarda
 }`,
 useCaseTest:`
-@Test
-void adopts_an_available_pet_and_publishes_the_event() {
-    InMemoryPetAdapter pets = new InMemoryPetAdapter();
-    pets.save(Pet.available(new PetId("1"), "Luna"));
-    RecordingEventPublisher events = new RecordingEventPublisher();
+class AdoptPetServiceTest {
 
-    AdoptPetUseCase useCase = new AdoptPetService(pets, pets, events);
+    private final FakePets pets = new FakePets();          // LoadPetPort y SavePetPort sobre un Map
+    private final RecordingPublisher publisher = new RecordingPublisher();
+    private final AdoptPetService adoptPetService =
+            new AdoptPetService(pets, pets, publisher, Clock.fixed(NOW, ZoneOffset.UTC));
 
-    AdoptionResult result = useCase.adopt(new AdoptPetCommand("1", "Ana"));
+    @Test
+    void adoptsAnAvailablePet() {
+        pets.add(Pet.available(new PetId("1"), "Luna"));
 
-    assertThat(result.status()).isEqualTo("ADOPTED");
-    assertThat(events.published()).hasSize(1);
+        AdoptionResult result = adoptPetService.adopt(command("1", "Ana"));
+
+        assertThat(result).isEqualTo(new AdoptionResult(new PetId("1"), "Luna", PetStatus.ADOPTED, new Owner("Ana")));
+        assertThat(publisher.events).containsExactly(new PetAdopted(new PetId("1"), "Luna", new Owner("Ana"), NOW));
+    }
 }`,
 archunit:`
-@AnalyzeClasses(packages = "com.example.petstore")
-class HexagonalArchitectureTest {
+class ArchitectureTest {
 
-    @ArchTest
-    static final ArchRule domain_is_independent =
-        noClasses().that().resideInAPackage("..domain..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                "..application..", "..adapter..", "org.springframework..");
+    private static final JavaClasses CLASSES = new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            .importPackages("com.example.petstore.adoption");
 
-    @ArchTest
-    static final ArchRule application_does_not_know_adapters =
-        noClasses().that().resideInAPackage("..application..")
-            .should().dependOnClassesThat().resideInAPackage("..adapter..");
+    @Test
+    void theDomainDependsOnNothingButJava() {
+        classes().that().resideInAPackage("..adoption.domain..")
+                .should().onlyDependOnClassesThat().resideInAnyPackage("..adoption.domain..", "java..", LOMBOK)
+                .check(CLASSES);
+    }
+
+    @Test
+    void theGeneratedRestContractIsOnlyUsedByTheRestAdapter() {
+        noClasses().that().resideOutsideOfPackages("..adoption.api.contract..", "..adoption.api.rest..")
+                .should().dependOnClassesThat().resideInAPackage("..adoption.api.contract..")
+                .check(CLASSES);
+    }
+
+    // ... y 6 reglas más: aplicación sin Spring, puertos sin tipos técnicos, adaptadores independientes
 }`,
+/* ----- notification-service (fase 2) ----- */
+notifListener:`
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class PetAdoptedListener {
+
+    private final NotifyAdoptionUseCase notifyAdoptionUseCase;
+
+    @RabbitListener(queues = RabbitConfig.QUEUE)
+    public void onPetAdopted(PetAdoptedMessage message) {
+        NotificationResult result = notifyAdoptionUseCase.notifyAdoption(new NotifyAdoptionCommand(
+                message.petId(), message.petName(), message.ownerName(), message.adoptedAt()));
+        if (result == NotificationResult.ALREADY_NOTIFIED) {
+            log.info("La adopción de la mascota {} ya se notificó: se ignora el mensaje repetido", message.petId());
+        }
+    }
+}`,
+notifService:`
+@RequiredArgsConstructor
+public class NotifyAdoptionService implements NotifyAdoptionUseCase {
+
+    private final SendNotificationPort sendNotificationPort;
+    private final NotifiedAdoptionsPort notifiedAdoptionsPort;
+    private final EmailAddress shelter;
+
+    @Override
+    public NotificationResult notifyAdoption(NotifyAdoptionCommand command) {
+        Adoption adoption = command.toAdoption();
+        if (notifiedAdoptionsPort.isNotified(adoption.key())) {
+            return NotificationResult.ALREADY_NOTIFIED;
+        }
+
+        sendNotificationPort.send(Notification.adoptionNotice(adoption, shelter));
+
+        // Se marca después de enviar: si el envío falla, el reintento volverá a intentarlo
+        notifiedAdoptionsPort.markNotified(adoption.key());
+        return NotificationResult.SENT;
+    }
+}`,
+notifSenders:`
+@Component
+@Profile("!log-notifications")
+public class SmtpNotificationSender implements SendNotificationPort {
+    // ... JavaMailSender y la dirección del remitente
+    @Override
+    public void send(Notification notification) {
+        SimpleMailMessage mail = new SimpleMailMessage();
+        mail.setFrom(fromEmail);
+        mail.setTo(notification.recipient().value());
+        mail.setSubject(notification.subject());
+        mail.setText(notification.text());
+        mailSender.send(mail);
+    }
+}
+
+@Component
+@Profile("log-notifications")
+public class LogNotificationSender implements SendNotificationPort {
+
+    @Override
+    public void send(Notification notification) {
+        log.info("Notificación para {} (solo log): {}", notification.recipient(), notification.subject());
+    }
+}`,
+notifYaml:`
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        default-requeue-rejected: false   # tras los reintentos, a la DLQ
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 500ms
+
+notification:
+  shelter-email: refugio@petstore.example`,
+notifFlow:`
+adoption-service ── pet.adopted ──> exchange petstore.events
+                                         │ routing key pet.adopted
+                                         v
+                              cola notification.pet-adopted ──(3 fallos)──> .dlq
+                                         │
+                                         v
+   PetAdoptedListener            adaptador de entrada
+          │ NotifyAdoptionCommand
+          v
+   NotifyAdoptionUseCase         ¿ya notificada? → no se repite
+          │ Notification ("Ana ha adoptado a Luna")
+          v
+   SendNotificationPort  ──>  SMTP (Mailpit)  |  log (perfil log-notifications)`,
+/* ----- Contratos (API first y contract first) ----- */
+openapi:`
+paths:
+  /pets/{petId}/adoption:
+    post:
+      tags: [Adoption]
+      operationId: adoptPet
+      requestBody:          # AdoptionRequest: ownerName no vacío, máximo 100
+      responses:
+        '200':              # AdoptionResponse: petId, petName, status, ownerName
+        '400':              # application/problem+json
+        '404':              # application/problem+json
+        '409':              # application/problem+json`,
+generated:`
+// target/generated-sources: nunca se edita, nunca sale de api-contract y api-rest
+public interface AdoptionApi {
+
+    @RequestMapping(method = RequestMethod.POST, value = AdoptionApi.PATH_ADOPT_PET,
+            produces = { "application/json", "application/problem+json" }, consumes = { "application/json" })
+    ResponseEntity<AdoptionResponse> adoptPet(@PathVariable("petId") String petId,
+                                              @Valid @RequestBody AdoptionRequest adoptionRequest);
+}`,
+/* ----- Cierre ----- */
 tags:`
-00-start           Aplicación inicial acoplada
-01-domain          Dominio extraído
-02-input-port      Puerto de entrada y caso de uso
-03-output-ports    Puertos de salida
-04-rest-adapter    Adaptador REST
-05-mongodb-adapter Adaptador MongoDB
-06-kafka-adapter   Adaptador Kafka
-07-testing         Tests por niveles
-08-final           Resultado completo`,
+00-start            Punto de partida: en capas, con REST y SOAP
+01-domain           Modelo de dominio en Java puro
+02-input-port       Caso de uso; el servicio antiguo lo implementa
+03-output-ports     Puertos de salida y caso de uso probado sin Spring
+04-mongodb-adapter  Adaptador de persistencia
+05-rabbitmq-adapter Adaptador de publicación del evento
+06-rest-adapter     Adaptador REST y arranque; adiós al código acoplado
+07-soap-adapter     El mismo caso de uso, un segundo canal
+08-testing          En memoria, contrato de persistencia y ArchUnit
+09-final            Documentación y material de la charla
+
+mvc/fase-2-notificaciones · hexagonal/fase-2-notificaciones`,
 run:`
-./mvnw clean verify
-docker compose up -d          # MongoDB y Kafka locales
-./mvnw spring-boot:run
-./mvnw spring-boot:run -Dspring-boot.run.profiles=in-memory`
+podman compose up -d                  # MongoDB, RabbitMQ y Mailpit
+./mvnw -DskipTests package
+java -jar services/adoption-service/boot/target/adoption-service-0.0.1-SNAPSHOT.jar
+java -jar services/notification-service/boot/target/notification-service-0.0.1-SNAPSHOT.jar
+# sin MongoDB: --spring.profiles.active=in-memory
+git diff mvc hexagonal --stat -- services/adoption-service`
 };
 
 /* =========================================================
-   Guion: módulos y pantallas
+   Guion: bloques, módulos y pantallas
    ========================================================= */
+const BLOCKS = ['Introducción', 'Bloque 1 · Puertos y adaptadores', 'Bloque 2 · Buenas y malas prácticas',
+  'Bloque 3 · Ventajas y decisiones de diseño', 'Cierre'];
+
 const MODULES = [
-{ title:'Portada y punto de partida', min:2, goal:'Situar el problema y explicar el recorrido.', screens:[
+/* ===================== Introducción ===================== */
+{ block:0, title:'Portada', min:2, goal:'Situar el problema y el recorrido.', screens:[
   { title:'Portada', body:()=>`
     <div class="hero">
-      <div><h2>Arquitectura hexagonal: del servicio acoplado a un dominio independiente</h2>
-      <p class="sub">Un caso práctico con Spring Boot, MongoDB y Kafka: adoptar una mascota</p></div>
+      <div>
+        <span class="live">Código en vivo</span>
+        <h2>Arquitectura hexagonal en la práctica</h2>
+        <p class="sub">Del diseño al código</p>
+        <ol class="agenda">
+          <li><b>Puertos y adaptadores</b><span>Del servicio acoplado a un núcleo independiente, paso a paso y en el IDE</span></li>
+          <li><b>Buenas y malas prácticas</b><span>El mismo caso en <code class="i">mvc</code> y en <code class="i">hexagonal</code>, lado a lado</span></li>
+          <li><b>Ventajas y decisiones de diseño</b><span>Lo que se gana, lo que cuesta y cuándo merece la pena</span></li>
+        </ol>
+        <p class="stackline">Java 25 · Spring Boot 4.1.2 · Maven multimódulo · MongoDB · RabbitMQ · REST y SOAP</p>
+      </div>
       ${fig(hex('map'),'Hacia aquí vamos: el negocio en el centro, la tecnología en el borde.')}
-    </div>
-    <div class="grid2 scope" style="margin-top:22px">
-      <div><h4>Qué vamos a construir</h4><ul><li>Un único caso: adoptar una mascota de la tienda.</li><li>Lo transformamos paso a paso, sin perder comportamiento.</li><li>Cada paso es una etiqueta del repositorio que compila y pasa tests.</li></ul></div>
-      <div class="out"><h4>Qué queda fuera</h4><ul><li>DDD completo.</li><li>Event sourcing.</li><li>Microservicios distribuidos.</li></ul></div>
     </div>`,
-    notes:'Presentar el caso en una frase: una tienda de mascotas donde alguien adopta una. Todo el mundo lo entiende sin contexto.' },
+    notes:'Presentar el caso en una frase: una tienda de mascotas donde alguien adopta una. Todo el mundo lo entiende sin contexto. Enseñar los tres bloques: son los del cartel.' },
   { title:'Una pregunta para el final', body:()=>`
     <p class="big-q">Si mañana MongoDB se sustituye por PostgreSQL, ¿qué parte de la aplicación debería cambiar?</p>
     <p class="lead">Quedaos con vuestra respuesta. La recuperamos en el cierre.</p>`,
-    notes:'No dar la respuesta. Pedir que alguien la diga en voz alta y recordarla en el módulo 11.' }
+    notes:'No dar la respuesta. Pedir que alguien la diga en voz alta y recordarla en el cierre.' }
 ]},
-{ title:'La aplicación que funciona, pero está acoplada', min:6, goal:'Mostrar un problema real antes de introducir terminología.', screens:[
+
+/* ===================== Bloque 1 ===================== */
+{ block:1, title:'Funciona, pero está acoplada', min:5, goal:'Mostrar un problema real antes de introducir terminología: la rama mvc.', screens:[
   { title:'Requisito funcional', body:()=>`
     <div class="split"><div>
       <h3>Adoptar una mascota</h3>
-      <ol class="steps"><li>Recibir el identificador de la mascota y el nombre del adoptante.</li><li>Buscar la mascota.</li><li>Comprobar que está disponible.</li><li>Marcarla como adoptada y guardarla.</li><li>Publicar el evento <code class="i">PetAdopted</code>.</li><li>Devolver el resultado al cliente REST.</li></ol>
+      <ol class="steps"><li>Recibir el identificador de la mascota y el nombre del adoptante, por REST o por SOAP.</li><li>Buscar la mascota.</li><li>Comprobar que está disponible.</li><li>Marcarla como adoptada y guardarla.</li><li>Publicar el evento <code class="i">pet.adopted</code> en RabbitMQ.</li><li>Devolver el resultado por el mismo canal.</li></ol>
       <p class="rule">Una mascota solo puede adoptarse si está disponible. Al adoptarla, queda asociada a su nuevo dueño.</p>
     </div><div>
-      ${code({file:'flujo-inicial.txt', lang:'text', src:`
-POST /pets/{petId}/adoption
-        |
-        v
-PetController
-        |
-        v
-PetService
-        |----> PetMongoRepository
-        |----> KafkaTemplate`})}
+      ${code({file:'flujo en la rama mvc', lang:'text', src:`
+POST /pets/{petId}/adoption        AdoptPet (SOAP, /ws)
+          |                               |
+          v                               v
+ AdoptionController               AdoptionEndpoint
+          \\                             /
+           v                           v
+                   PetService
+                |----> PetRepository   (MongoDB)
+                |----> RabbitTemplate  (pet.adopted)`})}
     </div></div>`,
-    notes:'Leer la regla en voz alta. Es la única regla de negocio; todo lo demás es tecnología.' },
+    notes:'Leer la regla en voz alta. Es la única regla de negocio; todo lo demás es tecnología. ' + live('opcional: rama <code>mvc</code>, etiqueta <code>00-start</code>. Lanzar un caso de <code>requests.http</code> y el sobre <code>soap-requests/01-adopt-pet.xml</code>.') },
   { title:'Código inicial: la entrada y la persistencia', body:()=>`
-    <div class="grid2"><div>${code({file:'PetController.java', src:SRC.controller0, hl:[11]})}${code({file:'PetMongoRepository.java', src:SRC.repo0})}</div>
-    <div>${code({file:'PetDocument.java', src:SRC.document0, hl:[2,8]})}<p>La mascota es un documento de MongoDB y su estado es un <code class="i">String</code>. Fijaos en dónde acaba esa clase.</p></div></div>`,
-    notes:'Pasar rápido: es código Spring corriente. La pregunta al aire es “¿dónde acaba PetDocument?”.' },
+    <div class="grid2"><div>${code({file:'controller/AdoptionController.java', src:SRC.controller0, hl:[5,9]})}
+      <p>El contrato REST se escribió antes que el código: <code class="i">AdoptionApi</code> y los DTOs se generan desde el OpenAPI, también en esta rama.</p></div>
+    <div>${code({file:'model/PetDocument.java', src:SRC.document0, hl:[1,13]})}<p>La mascota es un documento de MongoDB con <code class="i">@Data</code>, y su estado es un <code class="i">String</code>. Fijaos en dónde acaba esa clase.</p></div></div>`,
+    notes:'Pasar rápido: es código Spring corriente. La pregunta al aire es “¿dónde acaba PetDocument?”. Respuesta: en el controlador, en el servicio y en el endpoint SOAP.' },
   { title:'Código inicial: el servicio central', body:()=>`
-    ${code({file:'PetService.java', src:SRC.service0, hl:[5,6,11,12,15,18]})}
+    ${code({file:'service/PetService.java', src:SRC.service0, hl:[6,10,13,14,18,22]})}
     <p>Funciona. Las líneas resaltadas son las que nos van a dar problemas.</p>`,
-    notes:'Señalar: dos dependencias tecnológicas en el constructor (5-6), la regla compara un String de un documento Mongo y lanza una excepción HTTP (11-12), y el cambio de estado es un setter (15).' },
+    notes:'Señalar: RabbitTemplate en el constructor (6); la regla compara un String de un documento Mongo (13) y responde con excepciones HTTP (10, 14); el cambio de estado es un setter que cualquiera puede llamar (18); el mensaje de RabbitMQ se construye aquí (22).' },
+  { title:'El endpoint SOAP tiene que capturar una excepción HTTP', body:()=>`
+    <div class="split"><div>${code({file:'soap/AdoptionEndpoint.java', src:SRC.soap0, hl:[14,16,19]})}</div>
+    <div>${keys(['El servicio decidió hablar HTTP: 404 y 409.','El canal SOAP tiene que adivinar qué significa cada código HTTP para convertirlo en un fault.','Si mañana la adopción llega por RabbitMQ, habrá que hacer la misma traducción por tercera vez.'])}
+    <p class="lead">Es el síntoma más claro de que <b>el negocio conoce el canal</b>.</p></div></div>`,
+    notes:'Es la pantalla de malas prácticas que más impacta. Leer las líneas 16 y 19 en voz alta: un endpoint SOAP preguntando por códigos HTTP.' },
   { title:'Qué nos dice este código', body:()=>`
     <div class="split"><div>${fig(coupled(),'Todas las flechas salen del servicio hacia la tecnología.')}</div>
-    <div>${keys(['La regla de negocio trabaja sobre un documento de MongoDB.','Una regla de negocio responde con un código HTTP.','El servicio conoce Spring, MongoDB, Kafka y HTTP.','Para probar la regla hay que simular el repositorio y Kafka.'])}</div></div>`,
-    notes:'Preguntar: si mañana la adopción llega por un mensaje Kafka en vez de por REST, ¿qué sentido tiene ResponseStatusException?' },
-  { title:'Comprobación', body:()=>check('¿El principal problema es que la clase sea larga o que sus dependencias mezclen responsabilidades?',
-    '<p><strong>Las dependencias.</strong> El problema es el acoplamiento entre negocio y detalles tecnológicos. Partir la clase en tres más cortas, con las mismas dependencias, no lo resuelve.</p>'),
-    notes:'Si alguien dice “es larga”, aprovechar: son 20 líneas, no es eso.' }
+    <div>${keys(['La regla de negocio trabaja sobre un documento de MongoDB.','Una regla de negocio responde con un código HTTP.','El servicio conoce Spring, MongoDB, RabbitMQ y HTTP.','Para probar la regla hay que simular el repositorio y RabbitMQ.'])}
+    ${check('¿El principal problema es que la clase sea larga o que sus dependencias mezclen responsabilidades?',
+      '<p><strong>Las dependencias.</strong> El problema es el acoplamiento entre negocio y detalles tecnológicos. Partir la clase en tres más cortas, con las mismas dependencias, no lo resuelve.</p>')}</div></div>`,
+    notes:'Si alguien dice “es larga”, aprovechar: son 25 líneas, no es eso.' }
 ]},
-{ title:'Teoría: las piezas de la arquitectura hexagonal', min:9, goal:'Definir cada pieza antes de construirla, siempre sobre el caso de la adopción.', screens:[
+{ block:1, title:'Las piezas de la arquitectura hexagonal', min:6, goal:'Definir cada pieza antes de construirla, siempre sobre el caso de la adopción.', screens:[
   { title:'De dónde viene la idea', body:()=>`
     <div class="split"><div>
       <p class="lead">Alistair Cockburn la describió en 2005 con el nombre de <b>Ports and Adapters</b> (puertos y adaptadores). Su objetivo:</p>
       <p class="rule">Que la aplicación pueda usarse igual desde una persona, otro programa, un test o un script, y desarrollarse y probarse aislada de sus bases de datos y dispositivos.</p>
-      <h3>Por qué un hexágono</h3>
-      <p>No significa que haya seis de nada. Es solo una forma con muchos lados para dibujar varias entradas y salidas, sin la idea de “arriba” y “abajo” de las capas clásicas.</p>
+      <p>El hexágono no significa que haya seis de nada: es una forma con muchos lados para dibujar varias entradas y salidas, sin la idea de “arriba” y “abajo” de las capas.</p>
     </div><div>
       ${fig(hex('map'))}
       ${tbl(['Lado','Quién está ahí','Petstore'],[
-        ['Que conduce (driving, primario)','Quien llama a la aplicación','Cliente REST, test'],
-        ['Conducido (driven, secundario)','Lo que la aplicación usa','MongoDB, Kafka']])}
+        ['Que conduce (driving, primario)','Quien llama a la aplicación','Cliente REST, cliente SOAP, test'],
+        ['Conducido (driven, secundario)','Lo que la aplicación usa','MongoDB, RabbitMQ']])}
     </div></div>`,
-    notes:'Mencionar que Onion Architecture (Palermo, 2008) y Clean Architecture (Martin, 2012) comparten la misma regla de dependencias. Son variaciones de la misma idea.' },
+    notes:'Mencionar que Onion Architecture (Palermo, 2008) y Clean Architecture (Martin, 2012) comparten la misma regla de dependencias.' },
   { title:'Arquitectura en capas frente a hexagonal', body:()=>`
     <div class="grid2"><div>
-      <h3 style="margin-top:0">En capas</h3>
+      <h3 style="margin-top:0">En capas (rama mvc)</h3>
       ${code({file:'dependencias', lang:'text', src:`
-Controller
+Controller / Endpoint
     |
     v
 Service        (negocio)
@@ -752,77 +1065,62 @@ El negocio depende de los datos.`})}
     </div><div>
       <h3 style="margin-top:0">Hexagonal</h3>
       ${code({file:'dependencias', lang:'text', src:`
-REST adapter -----> núcleo <----- Mongo adapter
-                      ^
-                      |
-                Kafka adapter
+REST  ----->           <----- MongoDB
+SOAP  ----->  núcleo   <----- RabbitMQ
 
 Todo depende del núcleo.
 El núcleo no depende de nada técnico.`})}
     </div></div>
     <p>La diferencia no es cuántas carpetas hay, sino quién depende de quién. En capas, cambiar la base de datos toca el servicio. En hexagonal, toca solo un adaptador.</p>`,
-    notes:'Es el contraste que conecta con el módulo 1: el PetService inicial era una arquitectura en capas.' },
-  { title:'Dominio e infraestructura', body:()=>`
-    <div class="grid2">
-      ${concept('domain','Dominio','El modelo del negocio: entidades, valores, reglas, excepciones y eventos de negocio. No usa ningún framework y se entiende hablando con negocio.','Petstore: Pet, PetId, Owner, PetStatus, PetNotAvailableException, PetAdopted.')}
-      ${concept('adapter','Infraestructura','Toda la tecnología concreta que podría cambiar sin que cambie el negocio: framework web, base de datos, broker de mensajes, clientes HTTP, configuración.','Petstore: Spring MVC, MongoDB, Kafka, @Configuration. En hexagonal vive en los adaptadores y en la configuración.')}
+    notes:'Conecta con lo que acabamos de ver: el PetService de la rama mvc era una arquitectura en capas.' },
+  { title:'Dominio, aplicación e infraestructura', body:()=>`
+    <div class="grid3">
+      ${concept('domain','Dominio','El modelo del negocio: entidades, valores, reglas, excepciones y eventos. No usa ningún framework.','Pet, PetId, Owner, PetStatus, PetNotAvailableException, PetAdopted.')}
+      ${concept('app','Aplicación','Los casos de uso. El servicio de aplicación orquesta: carga, delega la decisión en el dominio, guarda y notifica.','AdoptPetUseCase, AdoptPetCommand, AdoptPetService.')}
+      ${concept('adapter','Infraestructura','Toda la tecnología que podría cambiar sin que cambie el negocio: web, base de datos, mensajería, configuración.','Spring MVC, Spring WS, MongoDB, RabbitMQ.')}
     </div>
-    <h3>Prueba rápida para clasificar una clase</h3>
-    ${keys(['Si sigue siendo verdad aunque cambiemos MongoDB por PostgreSQL, es dominio o aplicación.','Si desaparece o cambia al cambiar la tecnología, es infraestructura.','“Una mascota adoptada no puede volver a adoptarse” es dominio. “Se guarda en la colección pets” es infraestructura.'])}`,
-    notes:'' },
-  { title:'Caso de uso y servicio de aplicación', body:()=>`
+    ${tbl(['Si la frase suena a…','Va en'],[
+      ['“Si no está disponible, no se puede adoptar”','Dominio'],
+      ['“Primero cargo la mascota, luego la adopto, la guardo y publico el evento”','Aplicación'],
+      ['“Devuelve 409 si no está disponible” o “se guarda en la colección pets”','Adaptador']])}`,
+    notes:'Prueba rápida: si sigue siendo verdad aunque cambiemos MongoDB por PostgreSQL, es dominio o aplicación.' },
+  { title:'Comandos y resultados', body:()=>`
     <div class="split"><div style="display:grid;gap:14px">
-      ${concept('app','Caso de uso','Una intención del usuario o del sistema, expresada en lenguaje de negocio. Es la unidad de comportamiento que la aplicación ofrece al exterior.','Petstore: “adoptar una mascota”. Se expresa con la interfaz AdoptPetUseCase.')}
-      ${concept('app','Servicio de aplicación','La clase que implementa el caso de uso. Orquesta el flujo: carga datos, delega la decisión en el dominio, guarda y notifica. También es el sitio natural para transacciones y permisos.','Petstore: AdoptPetService.')}
+      ${concept('app','Comando','Objeto inmutable con los datos de una intención que cambia el estado. Pertenece al núcleo, no a la API.','AdoptPetCommand(PetId, Owner).')}
+      ${concept('app','Resultado','Lo que devuelve el caso de uso, independiente del formato de salida.','AdoptionResult.')}
     </div><div>
-      <h3 style="margin-top:0">¿Dominio o aplicación?</h3>
-      ${tbl(['Si la frase suena a…','Va en'],[
-        ['“Si no está disponible, no se puede adoptar”','Dominio'],
-        ['“Primero cargo la mascota, luego la adopto, la guardo y publico el evento”','Aplicación'],
-        ['“Devuelve 409 si no está disponible”','Adaptador']])}
-      <p>El servicio de aplicación no decide reglas: pregunta al dominio. Si empieza a llenarse de <code class="i">if</code> de negocio, esas reglas se han escapado del modelo.</p>
-    </div></div>`,
-    notes:'' },
-  { title:'Comandos, consultas y resultados', body:()=>`
-    <div class="split"><div style="display:grid;gap:14px">
-      ${concept('app','Comando','Objeto inmutable con los datos que necesita una intención que cambia el estado. Se nombra en imperativo y pertenece al núcleo, no a la API.','Petstore: AdoptPetCommand(petId, ownerName).')}
-      ${concept('app','Consulta','Petición que lee datos sin cambiar el estado. Separar comandos de consultas simplifica ambos.','Petstore: GetPetQuery(petId), si hubiera una pantalla de detalle.')}
-      ${concept('app','Resultado','Lo que devuelve el caso de uso, independiente del formato de salida.','Petstore: AdoptionResult.')}
-    </div><div>
-      <h3 style="margin-top:0">Por qué no usar el DTO REST</h3>
       ${code({file:'recorrido de los datos', lang:'text', src:`
-AdoptPetRequest     adaptador REST   (JSON, @Valid)
-      |  traduce
+AdoptionRequest (REST)  o  AdoptPetRequest (SOAP)
+      |  traduce el adaptador
       v
-AdoptPetCommand     núcleo
+AdoptPetCommand         núcleo
       |
       v
-AdoptionResult      núcleo
-      |  traduce
+AdoptionResult          núcleo
+      |  traduce el adaptador
       v
-AdoptionResponse    adaptador REST   (JSON)`})}
-      <p>Si mañana la adopción llega por Kafka, el mensaje se traduce al mismo comando. El núcleo no se entera de que el canal ha cambiado.</p>
-      <p>Validación: el formato (campo vacío, JSON mal formado) en el adaptador; las reglas de negocio en el dominio.</p>
+AdoptionResponse (REST) o  AdoptPetResponse (SOAP)`})}
+      <p>Validación: el formato (campo vacío, JSON o XML mal formado) en el adaptador; las reglas de negocio en el dominio.</p>
     </div></div>`,
-    notes:'' },
+    notes:cut('Si vamos tarde, contarlo de palabra sobre el diagrama (ahorra 1 min).') },
   { title:'Puertos de entrada y de salida', body:()=>`
     <p class="lead">Un <b>puerto</b> es una interfaz que define una conversación con el exterior en los términos del núcleo. Siempre la define y la posee el núcleo.</p>
     ${tbl(['','Puerto de entrada','Puerto de salida'],[
       ['Otros nombres','Driving, primario','Driven, secundario'],
       ['Qué expresa','Lo que la aplicación ofrece','Lo que la aplicación necesita'],
-      ['Quién lo define','El núcleo (application/port/in)','El núcleo (application/port/out)'],
+      ['Dónde vive aquí','<code class="i">application.port.in</code>','<code class="i">domain.port</code>'],
       ['Quién lo implementa','El servicio de aplicación','Un adaptador de salida'],
       ['Quién lo llama','Un adaptador de entrada','El servicio de aplicación'],
       ['Petstore','AdoptPetUseCase','LoadPetPort, SavePetPort, PublishPetAdoptedPort']])}
-    <p>Se nombran por capacidad (“guardar mascota”), nunca por tecnología (“repositorio Mongo”).</p>`,
+    <p>Se nombran por capacidad (“guardar mascota”), nunca por tecnología (“repositorio Mongo”). Que los de salida vivan en el dominio es una variante válida: lo que importa es que los define el núcleo.</p>`,
     notes:'La fila “quién lo implementa” es la que más confusión genera. Detenerse en ella.' },
   { title:'Adaptadores de entrada y de salida', body:()=>`
     <div class="split"><div>${fig(hex('adapters'))}</div><div style="display:grid;gap:14px">
-      ${concept('adapter','Adaptador','Código que traduce entre una tecnología concreta y un puerto. Solo traduce: no contiene reglas de negocio. Aquí viven los mappers y los modelos técnicos.','Si un adaptador tiene un if de negocio, ese if está en el sitio equivocado.')}
-      ${concept('adapter','De entrada','Recibe algo del exterior, lo traduce a un comando, llama al puerto de entrada y traduce el resultado.','Controlador REST, listener de Kafka, comando CLI, job batch, incluso un test.')}
-      ${concept('adapter','De salida','Implementa un puerto de salida con una tecnología, traduciendo entre el dominio y el modelo técnico.','MongoPetAdapter (Pet ↔ PetDocument), KafkaPetAdoptedAdapter.')}
+      ${concept('adapter','Adaptador','Código que traduce entre una tecnología y un puerto. Solo traduce: aquí viven los mappers y los modelos técnicos.','Si un adaptador tiene un if de negocio, ese if está en el sitio equivocado.')}
+      ${concept('adapter','De entrada','Recibe algo del exterior, lo traduce a un comando y llama al puerto de entrada.','Controlador REST, endpoint SOAP, listener de RabbitMQ, un test.')}
+      ${concept('adapter','De salida','Implementa un puerto de salida con una tecnología.','MongoPetAdapter (Pet ↔ PetDocument), RabbitPetAdoptedPublisher.')}
     </div></div>`,
-    notes:'<span class="cut">Recortable</span> Si vamos tarde, nombrar los adaptadores sobre el diagrama y saltar esta pantalla (ahorra 1 min).' },
+    notes:cut('Si vamos tarde, nombrar los adaptadores sobre el diagrama y saltar esta pantalla (ahorra 1 min).') },
   { title:'La regla de dependencias', body:()=>`
     <p class="rule">Las dependencias de código apuntan hacia el núcleo. El dominio no importa clases de infraestructura.</p>
     <div class="grid2"><div>
@@ -836,163 +1134,224 @@ AdoptPetService --> SavePetPort <--implementa-- MongoPetAdapter
 
 El código depende de dentro.`})}
     </div></div>
-    <p>Esto es la <b>inversión de dependencias</b>: en ejecución, el servicio acaba llamando a MongoDB, pero en el código solo conoce la interfaz <code class="i">SavePetPort</code>. Por eso podemos cambiar MongoDB sin tocar el servicio.</p>
-    <p>La arquitectura hexagonal no la define la forma de los paquetes, sino esta dirección de las dependencias.</p>`,
+    <p>Es la <b>inversión de dependencias</b>: en ejecución el servicio acaba llamando a MongoDB, pero en el código solo conoce <code class="i">SavePetPort</code>. Por eso podemos cambiar MongoDB sin tocar el servicio.</p>`,
     notes:'Es la idea central de toda la charla. Dejar que se asiente antes de seguir.' },
-  { title:'Resumen: cada pieza en su sitio', body:()=>`
-    ${tbl(['Pieza','Qué es','Paquete','Petstore'],[
-      ['Entidad','Objeto de negocio con identidad y reglas','domain/model','Pet'],
-      ['Excepción de dominio','Violación de una regla de negocio','domain/exception','PetNotAvailableException'],
-      ['Evento de dominio','Hecho de negocio ya ocurrido','domain/model','PetAdopted'],
-      ['Puerto de entrada','Operación que ofrece la aplicación','application/port/in','AdoptPetUseCase'],
-      ['Comando','Datos de una intención que cambia estado','application/port/in','AdoptPetCommand'],
-      ['Servicio de aplicación','Implementa y orquesta el caso de uso','application/service','AdoptPetService'],
-      ['Puerto de salida','Capacidad externa que se necesita','application/port/out','SavePetPort'],
-      ['Adaptador de entrada','Traduce un canal a un caso de uso','adapter/in/rest','PetRestController'],
-      ['Adaptador de salida','Implementa un puerto con tecnología','adapter/out/mongodb','MongoPetAdapter'],
-      ['Configuración','Conecta piezas y elige adaptadores','configuration','AdoptionConfiguration']])}`,
-    notes:'<span class="cut">Recortable</span> Es material de consulta. En la charla basta con señalarla y seguir (ahorra 1-2 min).' }
+  { title:'Los módulos Maven sobre el hexágono', body:()=>`
+    <div class="split"><div>${fig(modulesFig(),'Cada pieza es un módulo Maven. Las flechas son dependencias: todas apuntan hacia el núcleo.')}</div>
+    <div>${code({file:'dependencias que impone Maven', lang:'text', src:SRC.deps})}
+    ${keys(['La regla de dependencias deja de ser una convención: si no está en el POM, no compila.','api-rest y api-soap no ven infrastructure, ni al revés.','Solo boot conoce todas las piezas y las conecta.'])}</div></div>`,
+    notes:'Pantalla clave: une la teoría con el repositorio. Los nombres de módulo no llevan prefijo; cada servicio tiene su groupId.' }
 ]},
-{ title:'Paso 1: extraer el dominio', min:6, goal:'Aislar las reglas sin diseñar todavía toda la infraestructura.', screens:[
-  { title:'El modelo de dominio', body:()=>`
-    <div class="split"><div>${code({file:'domain/model/Pet.java', src:SRC.domain, hl:[12,13,14,16,17]})}</div>
-    <div>${keys(['La regla vive en el método adopt(): el comportamiento está junto a los datos.','El estado es un tipo del negocio, PetStatus, no un String.','No aparecen @Service, @Document, ResponseEntity ni KafkaTemplate.'])}
-    <p>Compárese con el servicio inicial: allí había un <code class="i">setStatus("ADOPTED")</code> que cualquiera podía llamar sin comprobar nada.</p></div></div>`,
-    notes:'Etiqueta 01-domain. Comparar la línea 13 con el if sobre pet.getStatus() del servicio original.' },
-  { title:'Estructura y primera demostración', body:()=>`
-    <div class="split"><div>${code({file:'domain/model/PetTest.java', src:SRC.domainTest, hl:[7,9,17,18]})}</div>
-    <div>${code({file:'estructura', lang:'text', src:`
-src/main/java/.../petstore/adoption/
-  domain/
-    model/
-    exception/`})}
-    ${decision({d:'Ninguna anotación de framework en el dominio de este caso.', why:'El modelo es pequeño y no gana nada con ellas; así el test es Java puro.', cost:'No es un dogma. Si una anotación no acopla de verdad (por ejemplo, de validación estándar), la decisión depende del coste real.'})}</div></div>`,
-    notes:'Demo: ejecutar PetTest. Remarcar el tiempo de ejecución: sin contexto de Spring.' }
+{ block:1, title:'Construir el núcleo', min:7, goal:'Dominio, caso de uso y puertos en Java puro: tres etiquetas, dos módulos nuevos.', screens:[
+  { title:'Paso 1: el modelo de dominio', live:'01-domain', body:()=>`
+    <div class="split"><div>${code({file:'domain/.../model/Pet.java', src:SRC.domain, hl:[1,16,17,18,22]})}</div>
+    <div>${keys(['La regla vive en adopt(): el comportamiento está junto a los datos.','El estado es un tipo del negocio, PetStatus, no un String.','adopt() devuelve el evento PetAdopted: el hecho lo produce el dominio.','Lombok sí, pero solo @Getter, @ToString y @EqualsAndHashCode: nada de @Data ni @Setter.'])}
+    ${code({file:'domain/.../model/*.java', src:SRC.valueObjects})}</div></div>`,
+    notes:live('rama <code>hexagonal</code>, partir de <code>00-start</code> y llegar a <code>01-domain</code>. El módulo <code>domain</code> nace como subcarpeta de <code>services/adoption-service</code>, junto al proyecto en capas, que sigue funcionando.') + ' Comparar la línea 17 con el if sobre pet.getStatus() del servicio original.' },
+  { title:'Paso 1: Java puro y un test sin Spring', live:'01-domain', body:()=>`
+    <div class="split"><div>${code({file:'domain/.../model/PetTest.java', src:SRC.domainTest, hl:[10,20,21]})}</div>
+    <div>${code({file:'domain/pom.xml (extracto)', lang:'text', src:SRC.domainPom})}
+    ${decision({d:'Lombok en el dominio, pero sin @Data ni @Setter.', why:'Solo actúa al compilar y ahorra código repetitivo sin acoplar nada.', cost:'Los setters permitirían saltarse la regla. Por eso el estado solo cambia en adopt().'})}</div></div>`,
+    notes:'Demo: ejecutar PetTest. Remarcar el tiempo: sin contexto de Spring. Si alguien importa Spring aquí, no compila: no está en el POM.' },
+  { title:'Paso 2: el puerto de entrada', live:'02-input-port', body:()=>`
+    <div class="grid2"><div>${code({file:'application/.../port/in/AdoptPetUseCase.java', src:SRC.inPort})}${code({file:'application/.../port/in/*.java', src:SRC.command})}</div>
+    <div>${keys(['El puerto de entrada expresa una capacidad del sistema: adoptar.','El comando usa objetos valor del dominio, no el DTO HTTP ni la clase JAXB.','El mismo caso de uso puede invocarse desde REST, SOAP, RabbitMQ o un test.'])}
+    <h3>Paso intermedio</h3>${code({file:'service/PetService.java (todavía en capas)', src:SRC.intermediate, hl:[3]})}
+    <p>El controlador y el endpoint SOAP ya dependen de la interfaz. Por dentro sigue el código acoplado, y los tests de extremo a extremo siguen en verde.</p></div></div>`,
+    notes:live('de <code>01-domain</code> a <code>02-input-port</code>. Nace el módulo <code>application</code>.') + ' Mensaje: se puede migrar sin parar el servicio.' },
+  { title:'Paso 3: el servicio de aplicación', live:'03-output-ports', body:()=>`
+    <div class="split"><div>${code({file:'application/.../service/AdoptPetService.java', src:SRC.appService, hl:[1,14,16,17]})}</div>
+    <div>${fig(hex('in'))}<p>Orquesta: cargar, adoptar, guardar, publicar. La decisión la toma el dominio (línea 14). Sin <code class="i">@Service</code>: se registra como bean en <code class="i">boot</code>.</p></div></div>`,
+    notes:live('de <code>02-input-port</code> a <code>03-output-ports</code>.') + ' Comparar con PetService: mismo flujo, ninguna clase de Spring en el constructor. El Clock también se inyecta: así el test controla el tiempo.' },
+  { title:'Paso 3: los puertos de salida', live:'03-output-ports', body:()=>`
+    <div class="split"><div>${code({file:'domain/.../port/*.java', src:SRC.outPorts})}
+      <h3>Criterios de diseño</h3>${keys(['Nombrar los puertos por capacidad, no por tecnología.','Los tipos son de dominio: Pet, no PetDocument.','No crear una interfaz por cada clase de forma automática.'])}</div>
+    <div>${fig(hex('out'))}
+    ${check('¿<code class="i">MongoPetRepositoryPort</code> es un buen nombre?',
+      '<p><strong>Normalmente no.</strong> Filtra la decisión tecnológica hacia el núcleo. <code class="i">SavePetPort</code> dice qué necesita la aplicación; el adaptador decide cómo.</p>')}</div></div>`,
+    notes:'Si preguntan por qué cargar y guardar son dos puertos: se podrían unir en uno. Los separamos para que cada uso pida solo lo que necesita.' }
 ]},
-{ title:'Paso 2: puerto de entrada y caso de uso', min:6, goal:'Separar la intención de negocio de su canal de entrada.', screens:[
-  { title:'Puerto de entrada y comando', body:()=>`
-    <div class="grid2"><div>${code({file:'application/port/in/AdoptPetUseCase.java', src:SRC.inPort})}${code({file:'application/port/in/AdoptPetCommand.java', src:SRC.command})}</div>
-    <div>${keys(['El puerto de entrada expresa una capacidad del sistema: adoptar.','El comando pertenece al límite de aplicación, no al contrato HTTP.','El mismo caso de uso puede invocarse desde REST, Kafka o un batch.'])}</div></div>`,
-    notes:'Etiqueta 02-input-port. Preguntar: ¿qué pasa si mañana la adopción llega por Kafka? Respuesta: otro adaptador, el mismo caso de uso.' },
-  { title:'El servicio de aplicación', body:()=>`
-    <div class="split"><div>${code({file:'application/service/AdoptPetService.java', src:SRC.appService, hl:[16,19,21,22]})}</div>
-    <div>${fig(hex('in'))}<p>El servicio de aplicación orquesta: cargar, adoptar, guardar, publicar. La decisión de si se puede adoptar la toma el dominio (línea 19).</p></div></div>`,
-    notes:'Comparar con PetService: mismo flujo, ninguna clase de Spring en el constructor.' }
-]},
-{ title:'Paso 3: puertos de salida', min:5, goal:'Hacer que la aplicación declare lo que necesita sin decidir la tecnología.', screens:[
-  { title:'Los tres puertos', body:()=>`
-    <div class="split"><div>${code({file:'application/port/out/*.java', src:SRC.outPorts})}
-      <h3>Criterios de diseño</h3>${keys(['Nombrar los puertos por capacidad, no por tecnología.','Los tipos son de dominio: Pet, no PetDocument.','No crear una interfaz por cada clase de forma automática.','Introducir un puerto cuando representa un límite o una variación relevante.'])}</div>
-    <div>${fig(hex('out'))}</div></div>`,
-    notes:'Etiqueta 03-output-ports. Si preguntan por qué cargar y guardar son dos puertos: se puede unir en uno (PetRepository). Lo separamos para que el test pueda dar solo lo que necesita.' },
-  { title:'Comprobación', body:()=>check('¿<code class="i">MongoPetRepositoryPort</code> es un buen nombre?',
-    '<p><strong>Normalmente no.</strong> Filtra la decisión tecnológica hacia el núcleo. <code class="i">SavePetPort</code> dice qué necesita la aplicación; el adaptador decide cómo.</p>'),
-    notes:'' }
-]},
-{ title:'Paso 4: implementar los adaptadores', min:8, goal:'Reconectar el núcleo con REST, MongoDB y Kafka.', screens:[
-  { title:'Adaptador REST de entrada', body:()=>`
-    <div class="split"><div>${code({file:'adapter/in/rest/PetRestController.java', src:SRC.rest, hl:[6,12,13]})}</div>
-    <div><h3>Responsabilidades</h3><ol class="steps"><li>Validar el formato HTTP.</li><li>Convertir request en comando.</li><li>Invocar el caso de uso.</li><li>Convertir el resultado en response.</li><li>Traducir excepciones con <code class="i">@RestControllerAdvice</code>.</li></ol></div></div>`,
-    notes:'Etiqueta 04-rest-adapter. El controlador depende del puerto, no del servicio concreto.' },
+{ block:1, title:'Conectar los adaptadores', min:7, goal:'Reconectar el núcleo con MongoDB, RabbitMQ, REST y SOAP sin cambiar el comportamiento.', screens:[
+  { title:'Paso 4: adaptador de MongoDB', live:'04-mongodb-adapter', body:()=>`
+    <div class="split"><div>${code({file:'infrastructure/.../mongodb/MongoPetAdapter.java', src:SRC.mongo, hl:[3,10,15]})}</div>
+    <div>${keys(['Un mismo adaptador implementa dos puertos: cargar y guardar.','PetDocument vive aquí y no sale de aquí. Puede llevar @Data.','PetMongoMapper traduce Pet ↔ PetDocument: es el precio explícito de separar modelo y persistencia.'])}</div></div>`,
+    notes:live('de <code>03-output-ports</code> a <code>04-mongodb-adapter</code>. Nace <code>infrastructure</code>.') + ' El documento conserva la forma de los datos de la rama mvc (colección pets).' },
+  { title:'Paso 5: adaptador de RabbitMQ', live:'05-rabbitmq-adapter', body:()=>`
+    <div class="split"><div>${code({file:'infrastructure/.../rabbitmq/RabbitPetAdoptedPublisher.java', src:SRC.rabbit, hl:[3,9,11]})}</div>
+    <div>${decision({d:'Publicar en RabbitMQ justo después de guardar, sin outbox.', why:'Es lo más simple para la demo y mantiene el foco en los límites.', cost:'Si MongoDB confirma y RabbitMQ falla, el evento se pierde. En producción: Transactional Outbox.'})}
+    <p>El mensaje se publica sin la cabecera <code class="i">__TypeId__</code>: los consumidores no dependen de los nombres de clase de este servicio.</p></div></div>`,
+    notes:live('de <code>04</code> a <code>05-rabbitmq-adapter</code>.') + ' Outbox en 30 segundos, sin desarrollarlo.' },
+  { title:'Paso 6: adaptador REST y arranque', live:'06-rest-adapter', body:()=>`
+    <div class="split"><div>${code({file:'api-rest/.../AdoptionController.java', src:SRC.rest, hl:[3,5,10]})}${code({file:'boot/.../config/UseCaseConfig.java', src:SRC.config, hl:[12]})}</div>
+    <div><h3 style="margin-top:0">Lo que pasa en este paso</h3><ol class="steps"><li>El controlador implementa la interfaz generada y llama al caso de uso.</li><li><code class="i">boot</code> conecta el caso de uso con los adaptadores (línea 12).</li><li>Se borra el código acoplado: PetService, el documento como modelo, el repositorio.</li><li>El test de extremo a extremo se mueve a <code class="i">boot</code> sin tocar una línea.</li></ol></div></div>`,
+    notes:live('de <code>05</code> a <code>06-rest-adapter</code>. Es el paso con más cambios: enseñar el diff con <code>git diff 05-rabbitmq-adapter 06-rest-adapter --stat</code>.') },
   { title:'Traducir errores de dominio a HTTP', body:()=>`
-    <div class="split"><div>${code({file:'adapter/in/rest/PetErrorHandler.java', src:SRC.advice, hl:[6,11]})}</div>
-    <div><p>El dominio lanza <code class="i">PetNotAvailableException</code> sin saber nada de HTTP. Decidir que eso es un 409 es responsabilidad del adaptador.</p><p>Es justo lo que hacía mal el servicio inicial con <code class="i">ResponseStatusException</code>.</p></div></div>`,
-    notes:'<span class="cut">Recortable</span> Si vamos tarde, mencionarlo de palabra desde la pantalla anterior (ahorra 1 min).' },
-  { title:'Adaptador MongoDB de salida', body:()=>`
-    <div class="split"><div>${code({file:'adapter/out/mongodb/MongoPetAdapter.java', src:SRC.mongo, hl:[3,10,15]})}</div>
-    <div>${keys(['Un mismo adaptador implementa dos puertos: cargar y guardar.','PetDocument vive aquí y no sale de aquí.','El mapper es el precio explícito de separar modelo y persistencia.'])}</div></div>`,
-    notes:'Etiqueta 05-mongodb-adapter.' },
-  { title:'Adaptador Kafka de salida', body:()=>`
-    <div class="split"><div>${code({file:'adapter/out/kafka/KafkaPetAdoptedAdapter.java', src:SRC.kafka, hl:[3,9,10]})}</div>
-    <div>${decision({d:'Publicar en Kafka justo después de guardar.', why:'Es lo más simple para la demo y mantiene el foco en los límites.', cost:'Si MongoDB confirma y Kafka falla, el evento se pierde. En producción: Transactional Outbox, guardando el evento en la misma transacción y publicándolo después.'})}</div></div>`,
-    notes:'Etiqueta 06-kafka-adapter. Outbox en 30 segundos, sin desarrollarlo. Si vamos tarde, solo nombrarlo.' },
+    <div class="split"><div>${code({file:'api-rest/.../RestExceptionHandler.java', src:SRC.advice, hl:[6,11]})}</div>
+    <div><p>El dominio lanza <code class="i">PetNotAvailableException</code> sin saber nada de HTTP. Decidir que eso es un 409 es responsabilidad del adaptador REST, y solo de él.</p><p>Las respuestas son idénticas byte a byte a las de la rama mvc.</p></div></div>`,
+    notes:cut('Si vamos tarde, mencionarlo de palabra desde la pantalla anterior (ahorra 1 min).') },
+  { title:'Paso 7: el mismo caso de uso, un segundo canal', live:'07-soap-adapter', body:()=>`
+    <div class="grid2"><div><p class="tag" style="font-weight:600">REST</p>${code({file:'api-rest/.../AdoptionController.java', src:SRC.rest, hl:[5,10]})}</div>
+    <div><p class="tag" style="font-weight:600">SOAP</p>${code({file:'api-soap/.../AdoptionEndpoint.java', src:SRC.soap, hl:[5,11]})}</div></div>
+    ${code({file:'api-soap/.../AdoptionFaultResolver.java (extracto)', src:SRC.faults, hl:[4,5]})}`,
+    notes:live('de <code>06</code> a <code>07-soap-adapter</code>.') + ' Comparar con el endpoint SOAP de mvc: ya no hay try/catch con códigos HTTP. El resolver traduce excepciones de dominio, igual que el RestExceptionHandler.' },
   { title:'Estructura final', body:()=>`
-    <div class="split"><div>${fig(hex('adapters'))}</div><div>${code({file:'estructura', lang:'text', src:SRC.structure})}</div></div>`,
-    notes:'Relacionar cada carpeta con una zona del diagrama.' }
+    <div class="split"><div>${fig(modulesFig())}</div><div>${code({file:'estructura', lang:'text', src:SRC.modules})}</div></div>`,
+    notes:'Relacionar cada módulo con una zona del diagrama.' }
 ]},
-{ title:'El beneficio visible: sustituir infraestructura', min:4, goal:'Demostrar el aislamiento, no limitarse a afirmarlo.', screens:[
-  { title:'Cambiar MongoDB por memoria', body:()=>`
-    ${beforeAfter({file:'MongoPetAdapter.java', src:SRC.mongoProfile, hl:[2]}, {file:'InMemoryPetAdapter.java', src:SRC.inMemory, hl:[2]}, 'Perfil por defecto','Perfil in-memory')}
-    <div class="split"><div>${keys(['El dominio no cambia.','El caso de uso no cambia.','El contrato REST no cambia.','Cambian la configuración y el adaptador seleccionado.'])}</div><div>${fig(hex('swap'))}</div></div>`,
-    notes:'Demo: arrancar con -Dspring-boot.run.profiles=in-memory y lanzar el mismo POST. Mismo resultado, sin MongoDB.' },
-  { title:'El trade-off honesto', body:()=>`
-    ${decision({d:'Los puertos LoadPetPort y SavePetPort no exponen nada de MongoDB.', why:'Así la sustitución es real y los tests del caso de uso no necesitan base de datos.', cost:'La sustitución no siempre es gratuita. Si el negocio depende de capacidades específicas de MongoDB, el puerto debe hacer explícita esa necesidad sin copiar su API.'})}
-    ${code({file:'configuration/AdoptionConfiguration.java', src:SRC.config})}`,
-    notes:'<span class="cut">Recortable</span> Se puede contar de palabra sobre la pantalla anterior (ahorra 1 min).' }
+{ block:1, title:'Un adaptador de entrada que no es REST', min:4, goal:'notification-service: el canal de entrada es una cola de RabbitMQ.', screens:[
+  { title:'Avisar al refugio de cada adopción', body:()=>`
+    <div class="split"><div>${code({file:'el recorrido', lang:'text', src:SRC.notifFlow})}</div>
+    <div>${keys(['Otro servicio, otra base de código: no comparte clases con adoption-service.','Escucha pet.adopted en su propia cola y deserializa a su propia clase.','Sin módulos de API: este servicio no publica ninguna.','Un mismo evento puede llegar dos veces: el caso de uso no repite el email.'])}</div></div>`,
+    notes:'Valor para la charla: un adaptador de entrada que no es REST ni SOAP. Mismo patrón que el controlador.' },
+  { title:'El listener es un adaptador de entrada', live:'hexagonal/fase-2-notificaciones', body:()=>`
+    <div class="grid2"><div>${code({file:'infrastructure/.../rabbitmq/listener/PetAdoptedListener.java', src:SRC.notifListener, hl:[8,10]})}</div>
+    <div>${code({file:'application/.../NotifyAdoptionService.java', src:SRC.notifService, hl:[11,15,18]})}</div></div>`,
+    notes:live('rama <code>hexagonal</code>, etiqueta <code>hexagonal/fase-2-notificaciones</code>. Comparar el listener con AdoptionController: traduce el mensaje a un comando y llama al caso de uso.') },
+  { title:'Dos adaptadores del mismo puerto', body:()=>`
+    <div class="split"><div>${code({file:'infrastructure/.../mail y logging', src:SRC.notifSenders, hl:[2,17]})}</div>
+    <div>${code({file:'boot/.../application.yml (extracto)', lang:'yaml', src:SRC.notifYaml})}
+    <p>Reintentos y cola de mensajes fallidos son política de la infraestructura: se configuran, no se programan en el caso de uso.</p></div></div>`,
+    notes:cut('Si vamos tarde, decir solo que SMTP y log son dos adaptadores de SendNotificationPort (ahorra 1 min).') },
+  { title:'Demo: una adopción, un email', body:()=>`
+    <ol class="steps" style="font-size:1.1rem">
+      <li>Arrancar <code class="i">adoption-service</code> y <code class="i">notification-service</code>.</li>
+      <li>Adoptar a Luna por REST: <code class="i">POST /pets/1/adoption {"ownerName":"Ana"}</code>.</li>
+      <li>Abrir Mailpit: <code class="i">http://localhost:8025</code>. Asunto: «Ana ha adoptado a Luna».</li>
+      <li>Repetir la adopción: 409, y ningún email nuevo.</li>
+      <li>Opcional: publicar un mensaje roto desde la consola de RabbitMQ y verlo en <code class="i">notification.pet-adopted.dlq</code>.</li>
+    </ol>
+    <p class="lead">El mismo email sale con la rama mvc y con la hexagonal: el test de extremo a extremo es el mismo fichero en las dos.</p>`,
+    notes:live('demo con los dos JAR arrancados y Mailpit abierto en otra pestaña. Si algo falla, el perfil <code>log-notifications</code> lo enseña en el log.') }
 ]},
-{ title:'Testing por capas', min:5, goal:'Demostrar una consecuencia práctica de la separación.', screens:[
-  { title:'Pirámide propuesta', body:()=>`
-    <div class="split"><div class="pyramid">
-      <div style="width:38%;background:var(--risk-soft)">End-to-end<small>Pocos, el flujo completo</small></div>
-      <div style="width:58%;background:var(--adapter-soft)">Adaptadores<small>@DataMongoTest, Testcontainers</small></div>
-      <div style="width:78%;background:var(--app-soft)">Caso de uso<small>Puertos con fakes o mocks</small></div>
-      <div style="width:98%;background:var(--domain-soft)">Dominio<small>Rápidos y sin mocks cuando sea posible</small></div>
-    </div><div><p class="lead">Cada nivel prueba lo que de verdad integra. Los tests de integración no desaparecen: se reservan para la tecnología.</p></div></div>`,
-    notes:'Etiqueta 07-testing.' },
-  { title:'Test del caso de uso sin Spring', body:()=>`
-    <div class="split"><div>${code({file:'application/service/AdoptPetServiceTest.java', src:SRC.useCaseTest, hl:[3,5,7]})}</div>
-    <div>${fig(hex('test'),'Los adaptadores reales se cambian por implementaciones de test.')}<p>En la línea 7, el mismo adaptador en memoria sirve como puerto de carga y de guardado.</p></div></div>`,
-    notes:'Demo: ejecutar el test y mostrar el tiempo. Compararlo con lo que costaba probar PetService.' }
+
+/* ===================== Bloque 2 ===================== */
+{ block:2, title:'mvc frente a hexagonal, lado a lado', min:3, goal:'El mismo comportamiento, dos diseños. Comparar en lugar de afirmar.', screens:[
+  { title:'El caso de uso', body:()=>`
+    ${beforeAfter({file:'mvc · service/PetService.java', src:SRC.service0, hl:[13,18,22]}, {file:'hexagonal · application/.../AdoptPetService.java', src:SRC.appService, hl:[14,16,17]}, 'Rama mvc','Rama hexagonal')}`,
+    notes:'En mvc la regla es un if sobre un String y un setter; en hexagonal es pet.adopt(). En mvc el servicio construye el mensaje de RabbitMQ; en hexagonal publica un evento de dominio por un puerto.' },
+  { title:'El canal SOAP', body:()=>`
+    ${beforeAfter({file:'mvc · soap/AdoptionEndpoint.java', src:SRC.soap0, hl:[14,16,19]}, {file:'hexagonal · api-soap/.../AdoptionEndpoint.java', src:SRC.soap, hl:[11]}, 'Rama mvc','Rama hexagonal')}`,
+    notes:'El endpoint hexagonal no captura nada: traduce y llama. Los faults los resuelve AdoptionFaultResolver a partir de excepciones de dominio.' },
+  { title:'Pieza a pieza', body:()=>`
+    ${tbl(['Pieza','mvc','hexagonal'],[
+      ['Regla de negocio','PetService compara un String del documento','Pet.adopt() en domain'],
+      ['Errores','ResponseStatusException; SOAP traduce códigos HTTP','Excepciones de dominio, traducidas en api-rest y en api-soap'],
+      ['Persistencia','El documento con @Data es el modelo de negocio','LoadPetPort y SavePetPort: MongoDB o memoria'],
+      ['Evento','RabbitTemplate en el servicio','PublishPetAdoptedPort'],
+      ['Composición','@Service y escaneo','AdoptPetService sin anotaciones, registrado en boot'],
+      ['Notificaciones','El servicio recibe el mensaje, usa JavaMailSender y consulta el perfil','Listener como adaptador de entrada; SMTP y log, dos adaptadores'],
+      ['Tests','Mockito sobre el servicio','Dominio y caso de uso sin Spring, adaptadores, ArchUnit']])}
+    ${code({file:'compararlo uno mismo', lang:'bash', src:`git diff mvc hexagonal --stat -- services/adoption-service`})}`,
+    notes:cut('Material de consulta: señalar la tabla y seguir (ahorra 1 min).') }
 ]},
-{ title:'Hexagonal, DDD y SOLID', min:5, goal:'Poner nombre a lo que ya hemos visto en el código y separar conceptos que suelen mezclarse.', screens:[
-  { title:'¿Hexagonal es DDD?', body:()=>`
-    <div class="grid2">
-      ${concept('app','Arquitectura hexagonal','Decide dónde está la frontera entre negocio y tecnología, y hacia dónde apuntan las dependencias.','Responde a: ¿qué puede cambiar sin tocar el negocio?')}
-      ${concept('domain','DDD (Domain-Driven Design)','Eric Evans, 2003. Decide cómo modelar el negocio dentro de esa frontera, hablando el mismo idioma que los expertos del negocio.','Responde a: ¿qué conceptos y reglas tiene el negocio?')}
-    </div>
-    <p class="lead">Son independientes y se complementan. Se puede hacer hexagonal con un modelo pobre, y DDD sin hexagonal. Juntas funcionan bien: la hexagonal protege el modelo que DDD construye.</p>
-    <h3>DDD estratégico, en dos ideas</h3>
-    ${keys(['<b>Lenguaje ubicuo:</b> el código usa las palabras del negocio. Decimos adopt() y no setStatus("ADOPTED").','<b>Contexto delimitado (bounded context):</b> cada modelo tiene validez en un ámbito. “Mascota” en Adopción no tiene por qué ser la misma clase que “mascota” en Veterinaria.'])}`,
-    notes:'Recordar que el DDD completo queda fuera de la charla. Aquí solo se relaciona.' },
-  { title:'DDD táctico en el Petstore', body:()=>`
-    ${tbl(['Pieza DDD','Qué es','Petstore'],[
-      ['Entidad','Tiene identidad que se mantiene aunque cambien sus datos','Pet'],
-      ['Objeto valor','Se define por sus atributos, es inmutable y no tiene identidad propia','PetId, Owner, PetStatus'],
-      ['Agregado y raíz','Grupo que se modifica como una unidad, siempre a través de su raíz','Pet es la raíz de su agregado'],
-      ['Evento de dominio','Algo relevante que ya ha ocurrido, en pasado','PetAdopted'],
-      ['Repositorio','Colección de agregados. En hexagonal, es un puerto de salida','LoadPetPort y SavePetPort'],
-      ['Servicio de dominio','Regla que no pertenece de forma natural a ninguna entidad','No lo necesitamos, así que no lo forzamos']])}`,
-    notes:'<span class="cut">Recortable</span> Si vamos tarde, quedarse con la fila del repositorio: es el punto de unión entre DDD y hexagonal (ahorra 1-2 min).' },
-  { title:'SOLID en el código que hemos visto', body:()=>`
-    ${tbl(['Principio','Qué dice','Dónde lo hemos visto'],[
-      ['S: responsabilidad única','Una clase tiene un solo motivo para cambiar','PetRestController cambia si cambia la API; MongoPetAdapter, si cambia la persistencia; Pet, si cambia la regla'],
-      ['O: abierto/cerrado','Abierto a extensión, cerrado a modificación','Añadimos InMemoryPetAdapter sin tocar AdoptPetService'],
-      ['L: sustitución de Liskov','Cualquier implementación de una interfaz debe poder sustituir a otra sin romper a quien la usa','El adaptador en memoria cumple el mismo contrato que el de Mongo: lo que se guarda se puede cargar'],
-      ['I: segregación de interfaces','Interfaces pequeñas, pensadas para quien las usa','LoadPetPort y SavePetPort separados'],
-      ['D: inversión de dependencias','Lo de alto nivel no depende de lo de bajo nivel: ambos dependen de abstracciones','El núcleo define SavePetPort y el adaptador Mongo la implementa']])}
-    <p class="rule">La D de SOLID es la arquitectura hexagonal aplicada a una clase. La hexagonal es la D aplicada a toda la aplicación.</p>`,
-    notes:'Para la L, se puede mencionar un contract test compartido que ejecuten ambos adaptadores.' }
-]},
-{ title:'Errores frecuentes y decisiones pragmáticas', min:6, goal:'Evitar una aplicación superficial o dogmática.', screens:[
+{ block:2, title:'Errores frecuentes y buenas prácticas', min:6, goal:'Evitar una aplicación superficial o dogmática.', screens:[
   { title:'Errores de estructura', body:()=>`
     <div class="grid2"><div>
-      ${mistake(1,'Renombrar paquetes sin invertir dependencias','domain importa documentos Mongo, repositorios Spring o DTOs.','validar las dependencias con ArchUnit.')}
-      ${mistake(2,'DTO REST usado como entidad de dominio','cualquier cambio de API contamina las reglas.','mapeo explícito en el adaptador de entrada.')}
+      ${mistake(1,'Renombrar paquetes sin invertir dependencias','domain importa documentos Mongo, repositorios Spring o DTOs.','módulos Maven y reglas de ArchUnit.')}
+      ${mistake(2,'DTO generado usado como modelo de dominio','cualquier cambio del contrato contamina las reglas.','el código generado no sale de su módulo de API; mappers explícitos.')}
     </div><div>
-      ${mistake(3,'Lógica de negocio en adaptadores','las reglas se duplican entre REST, Kafka y procesos batch.','concentrarlas en dominio o aplicación según su naturaleza.')}
-      ${mistake(4,'Un puerto por cada repositorio o clase','exceso de interfaces ceremoniales.','diseñar puertos por capacidad y frontera real.')}
+      ${mistake(3,'Lógica de negocio en adaptadores','las reglas se duplican entre REST, SOAP y RabbitMQ.','concentrarlas en dominio o aplicación según su naturaleza.')}
+      ${mistake(4,'El negocio habla el idioma del canal','ResponseStatusException en el servicio, y SOAP adivinando códigos HTTP.','excepciones de dominio, traducidas solo en el adaptador de cada canal.')}
     </div></div>`,
-    notes:'' },
+    notes:'El error 4 es el que vimos en el bloque 1 con el endpoint SOAP de mvc.' },
   { title:'Errores de criterio', body:()=>`
     <div class="grid2"><div>
-      ${mistake(5,'Modelo anémico por obligación','el servicio de aplicación contiene todas las reglas, como el setStatus del módulo 1.','proteger invariantes cerca del modelo que las posee, como Pet.adopt().')}
-      ${mistake(6,'Ignorar transacciones y consistencia','MongoDB confirma pero Kafka falla.','outbox, reintentos, idempotencia y observabilidad.')}
+      ${mistake(5,'Modelo anémico por obligación','el servicio contiene todas las reglas, como el setStatus de mvc.','proteger invariantes en el modelo que las posee, como Pet.adopt().')}
+      ${mistake(6,'Ignorar transacciones y consistencia','MongoDB confirma pero RabbitMQ falla.','outbox, reintentos, idempotencia y observabilidad.')}
     </div><div>
-      ${mistake(7,'Aplicarla a un CRUD trivial sin variabilidad','más archivos y coste cognitivo sin beneficio proporcional.','modularidad proporcional al riesgo, la vida útil y la complejidad del dominio.')}
+      ${mistake(7,'Un puerto por cada clase','exceso de interfaces ceremoniales.','puertos por capacidad y frontera real.')}
+      ${mistake(8,'Aplicarla a un CRUD trivial','más ficheros y coste cognitivo sin beneficio.','modularidad proporcional al riesgo y a la complejidad del dominio.')}
     </div></div>`,
-    notes:'<span class="cut">Recortable</span> Si vamos tarde, quedarse solo con el error 7 (ahorra 2 min). Es el que evita presentar hexagonal como solución universal. Ojo: un petstore real con solo altas y bajas sería justo ese CRUD trivial; lo que justifica el ejemplo es la regla de adopción y el evento.' },
+    notes:cut('Si vamos tarde, quedarse solo con el error 8 (ahorra 2 min). Es el que evita presentar hexagonal como solución universal.') },
+  { title:'Buenas prácticas', body:()=>`
+    <div class="grid2"><div>
+      ${good(1,'Contratos antes que código','el contrato es la fuente de verdad y se puede revisar antes de programar.','OpenAPI, WSDL y XSD, y el evento en contracts/events, en las dos ramas.')}
+      ${good(2,'Un solo sitio para traducir cada canal','los errores se ven igual vengan de donde vengan.','RestExceptionHandler y AdoptionFaultResolver.')}
+      ${good(3,'Composición explícita','el núcleo no depende del framework.','AdoptPetService sin @Service, registrado en boot.')}
+    </div><div>
+      ${good(4,'Tests que no conocen la implementación','prueban el comportamiento, no la estructura.','los tests de extremo a extremo son el mismo fichero en mvc y hexagonal y pasan en cada etiqueta.')}
+      ${good(5,'Consumidores tolerantes','el productor puede evolucionar sin romper a nadie.','clase propia, ignorar campos desconocidos, sin __TypeId__, DLQ.')}
+      ${good(6,'Idempotencia en los consumidores','los mensajes pueden llegar dos veces.','NotifiedAdoptionsPort: un email por adopción.')}
+    </div></div>`,
+    notes:'Mismo formato que los errores, en positivo. Cada práctica señala dónde está en el repositorio.' },
   { title:'Que la arquitectura se compruebe sola', body:()=>`
-    <div class="split"><div>${code({file:'HexagonalArchitectureTest.java', src:SRC.archunit, hl:[6,7,8,9]})}</div>
-    <div><p>La corrección del error 1, en código. Si alguien importa un repositorio Spring desde <code class="i">domain</code>, el build falla.</p></div></div>`,
-    notes:'' }
+    <div class="split"><div>${code({file:'boot/.../ArchitectureTest.java', src:SRC.archunit, hl:[9,10,16,17]})}</div>
+    <div><p class="lead">Dos defensas que se complementan:</p>
+    ${keys(['<b>Maven</b>: si domain no declara Spring, importar Spring no compila.','<b>ArchUnit</b>: lo que Maven no ve. Que los puertos no usen tipos técnicos, que el código generado no salga de su adaptador y que los adaptadores no se conozcan.'])}</div></div>`,
+    notes:'La corrección del error 1, en código. Si da tiempo, enseñar en vivo el error de compilación al importar @Component en Pet.' }
 ]},
-{ title:'Cierre', min:3, goal:'Fijar cinco reglas y responder la pregunta inicial.', screens:[
+
+/* ===================== Bloque 3 ===================== */
+{ block:3, title:'Ventajas que se pueden demostrar', min:4, goal:'Demostrar el aislamiento, no limitarse a afirmarlo.', screens:[
+  { title:'Cambiar MongoDB por memoria', live:'08-testing', body:()=>`
+    ${beforeAfter({file:'MongoPetAdapter.java', src:SRC.mongoProfile, hl:[2]}, {file:'InMemoryPetAdapter.java', src:SRC.inMemory, hl:[2]}, 'Perfil por defecto','Perfil in-memory')}
+    ${keys(['El dominio, el caso de uso y los contratos REST y SOAP no cambian.','Cambian la configuración y el adaptador seleccionado.'])}`,
+    notes:live('arrancar con <code>--spring.profiles.active=in-memory</code> y lanzar el mismo POST. Mismo resultado, sin MongoDB.') + ' Los dos adaptadores pasan el mismo contrato de tests: PetPersistenceContract.' },
+  { title:'Testing por capas', body:()=>`
+    <div class="split"><div>${code({file:'application/.../AdoptPetServiceTest.java', src:SRC.useCaseTest, hl:[3,5,6]})}</div>
+    <div class="pyramid">
+      <div style="width:42%;background:var(--risk-soft)">Extremo a extremo<small>El mismo fichero en mvc y hexagonal</small></div>
+      <div style="width:62%;background:var(--adapter-soft)">Adaptadores<small>@DataMongoTest, @WebMvcTest, contrato común</small></div>
+      <div style="width:80%;background:var(--app-soft)">Caso de uso<small>Puertos con dobles escritos a mano</small></div>
+      <div style="width:98%;background:var(--domain-soft)">Dominio<small>Java puro, milisegundos</small></div>
+    </div></div>`,
+    notes:'Demo: ejecutar AdoptPetServiceTest y mostrar el tiempo. Compararlo con lo que costaba probar PetService.' },
+  { title:'Ventajas y costes', body:()=>`
+    ${tbl(['Ventaja','Coste'],[
+      ['El negocio se prueba en milisegundos, sin infraestructura','Más ficheros: puertos, mappers, modelos técnicos'],
+      ['Cambiar MongoDB o añadir un canal toca solo un adaptador','Mapeos explícitos entre dominio, DTOs y documentos'],
+      ['Las reglas de dependencia las vigila el compilador','Más módulos Maven y más configuración de construcción'],
+      ['El mismo caso de uso sirve REST, SOAP y mensajería','Curva de aprendizaje para el equipo'],
+      ['Migración gradual: cada paso compila y pasa los tests','Disciplina: un atajo en un adaptador rompe el modelo']])}`,
+    notes:'Ser honesto: no es gratis. La pregunta no es si es mejor, sino si compensa en este servicio.' }
+]},
+{ block:3, title:'Decisiones de diseño', min:4, goal:'Explicar por qué el código es como es, y cuándo merece la pena.', screens:[
+  { title:'API first y contract first', body:()=>`
+    <div class="split"><div>${code({file:'api-contract/.../adoption-api.yaml (resumen)', lang:'yaml', src:SRC.openapi})}${code({file:'AdoptionApi.java (generada)', src:SRC.generated})}</div>
+    <div>${keys(['Los contratos REST y SOAP se escriben y se revisan antes que el código.','No depende de la arquitectura: la rama mvc también genera desde los contratos.','El código generado es un detalle del adaptador: nunca llega al dominio ni a los puertos.','Cada servicio genera sus propias clases. Sin librería de DTOs compartida, los despliegues no se acoplan.'])}</div></div>`,
+    notes:'Anécdota útil: el XSD se llama adoption-types.xsd porque Spring WS no publica un WSDL y un XSD con el mismo nombre. Los contratos también tienen restricciones técnicas.' },
+  { title:'Decisiones de diseño', body:()=>`
+    ${tbl(['Decisión','Por qué'],[
+      ['Sin @Data ni @Setter en el dominio','Los setters saltarían la regla; Lombok solo donde no hace daño'],
+      ['Puertos sin detalles técnicos','Los tipos son de dominio: Pet, no PetDocument ni DTOs'],
+      ['LoadPetPort y SavePetPort separados','Cada uso pide solo lo que necesita'],
+      ['Puertos de salida en domain','Variante válida: lo importante es que los define el núcleo'],
+      ['Publicación sin outbox en la demo','Foco en los límites; en producción, outbox'],
+      ['Servicio de aplicación sin @Service','El núcleo no depende de Spring; se compone en boot'],
+      ['Un groupId por servicio y módulos sin prefijo','domain y application son distintos en cada servicio'],
+      ['Módulos solo donde hacen falta','notification-service no tiene módulos de API'],
+      ['El registro de mascotas se queda en capas (fase 3)','Un CRUD sin reglas no gana nada con hexagonal']])}`,
+    notes:'No leer la tabla: elegir dos o tres según el público.' },
+  { title:'Cuándo sí y cuándo no', body:()=>`
+    <div class="grid2"><div>
+      <h3 style="margin-top:0">Sí</h3>${keys(['Reglas de negocio que merecen protegerse.','Varios canales de entrada o salida.','Vida larga y tecnología que cambiará.','Equipos que necesitan probar el negocio rápido.'])}
+    </div><div>
+      <h3 style="margin-top:0">No, o todavía no</h3>${keys(['CRUD sin reglas: el registro de mascotas.','Prototipos y scripts de vida corta.','Equipos sin tiempo para la disciplina que exige.','Cuando un puerto solo existe por costumbre.'])}
+    </div></div>
+    <p class="rule">Modularidad proporcional al riesgo, a la vida útil y a la complejidad del dominio.</p>`,
+    notes:'' },
+  { title:'Hexagonal, DDD y SOLID', body:()=>`
+    <div class="grid2">
+      ${concept('app','Arquitectura hexagonal','Decide dónde está la frontera entre negocio y tecnología, y hacia dónde apuntan las dependencias.','¿Qué puede cambiar sin tocar el negocio?')}
+      ${concept('domain','DDD','Decide cómo modelar el negocio dentro de esa frontera, con el lenguaje de los expertos.','¿Qué conceptos y reglas tiene el negocio? Pet es la raíz de su agregado; PetId y Owner, objetos valor; PetAdopted, un evento.')}
+    </div>
+    ${tbl(['Principio SOLID','Dónde lo hemos visto'],[
+      ['S: responsabilidad única','AdoptionController cambia si cambia la API; MongoPetAdapter, si cambia la persistencia; Pet, si cambia la regla'],
+      ['O: abierto/cerrado','InMemoryPetAdapter y el canal SOAP se añaden sin tocar AdoptPetService'],
+      ['L: sustitución de Liskov','PetPersistenceContract: Mongo y memoria pasan los mismos tests'],
+      ['I: segregación de interfaces','LoadPetPort y SavePetPort separados'],
+      ['D: inversión de dependencias','El núcleo define SavePetPort y el adaptador la implementa']])}`,
+    notes:cut('Material de consulta. Si sobra tiempo, la frase clave: la D de SOLID es la hexagonal aplicada a una clase (ahorra 2 min).') }
+]},
+
+/* ===================== Cierre ===================== */
+{ block:4, title:'Cierre', min:2, goal:'Fijar cinco reglas y responder la pregunta inicial.', screens:[
   { title:'Cinco reglas para recordar', body:()=>`
     <ol class="steps" style="font-size:1.15rem;max-width:60ch"><li>El dominio no conoce detalles de infraestructura.</li><li>La aplicación expresa casos de uso y coordina el flujo.</li><li>Los puertos representan capacidades, no tecnologías.</li><li>Los adaptadores traducen entre el núcleo y el exterior.</li><li>La arquitectura debe reducir el coste del cambio, no aumentar el número de archivos.</li></ol>`,
     notes:'' },
   { title:'La pregunta del principio', body:()=>check('Si mañana MongoDB se sustituye por PostgreSQL, ¿qué parte debería cambiar?',
-    '<p><strong>El adaptador de persistencia y la configuración.</strong> Pet, AdoptPetService y el contrato REST se mantienen. Lo acabamos de ver con el adaptador en memoria.</p>', 'Comparad con lo que respondisteis al principio.'),
-    notes:'Recuperar la respuesta que dio la audiencia en el módulo 0.' },
+    '<p><strong>El adaptador de persistencia y la configuración.</strong> Pet, AdoptPetService y los contratos REST y SOAP se mantienen. Lo acabamos de ver con el adaptador en memoria.</p>', 'Comparad con lo que respondisteis al principio.'),
+    notes:'Recuperar la respuesta que dio la audiencia al principio.' },
   { title:'Para seguir', body:()=>`
     <p class="rule">Hexagonal no consiste en dibujar un hexágono. Consiste en conservar las decisiones de negocio cuando cambian las decisiones tecnológicas.</p>
     <div class="grid2"><div>${code({file:'etiquetas del repositorio', lang:'text', src:SRC.tags})}</div><div>${code({file:'arranque', lang:'bash', src:SRC.run})}</div></div>`,
@@ -1021,10 +1380,13 @@ function parseHash(){
 
 function renderNav(){
   const cur = flat[idx].mi;
+  let lastBlock = -1;
   $('navList').innerHTML = MODULES.map((m,i) => {
     const state = i < cur ? 'done' : i === cur ? 'current' : 'pending';
     const label = state==='done' ? 'completado' : state==='current' ? 'actual' : 'pendiente';
-    return `<li><button data-mod="${i}" data-state="${state}" ${state==='current'?'aria-current="step"':''} aria-label="Módulo ${i}: ${m.title}, ${label}">
+    const header = m.block !== lastBlock ? `<li class="blk">${BLOCKS[m.block]}</li>` : '';
+    lastBlock = m.block;
+    return `${header}<li><button data-mod="${i}" data-state="${state}" ${state==='current'?'aria-current="step"':''} aria-label="${BLOCKS[m.block]}, módulo ${i}: ${m.title}, ${label}">
       <span class="dot">${state==='done' ? '✓' : i}</span><span><span class="t">${m.title}</span><span class="m">${m.min} min, ${m.screens.length} pantallas</span></span></button></li>`;
   }).join('');
 }
@@ -1033,7 +1395,7 @@ function render(animate=true){
   const {mi, si} = flat[idx];
   const mod = MODULES[mi], scr = mod.screens[si];
   screenEl.innerHTML = `
-    <div class="modhead"><b>Módulo ${mi}</b><span>${mod.min} min</span><span>Pantalla ${si+1} de ${mod.screens.length}</span></div>
+    <div class="modhead"><b>${BLOCKS[mod.block]}</b><span>Módulo ${mi}</span><span>${mod.min} min</span><span>Pantalla ${si+1} de ${mod.screens.length}</span>${scr.live ? `<span class="live">Código en vivo · ${scr.live}</span>` : ''}</div>
     <h2>${si===0 && mi!==0 ? mod.title : scr.title}</h2>
     ${si===0 && mi!==0 ? `<p class="goal">${mod.goal}</p><h3 style="margin-top:0">${scr.title}</h3>` : ''}
     ${scr.body()}`;
@@ -1046,13 +1408,13 @@ function render(animate=true){
   $('bar').firstElementChild.style.width = pct + '%';
   $('bar').setAttribute('aria-valuenow', pct);
   $('progressText').textContent = `Pantalla ${idx+1} de ${flat.length}`;
-  $('screenPos').textContent = `${mod.title}`;
+  $('screenPos').textContent = `${BLOCKS[mod.block]} · ${mod.title}`;
   $('prev').disabled = idx === 0;
   $('next').disabled = idx === flat.length - 1;
   $('next').textContent = idx === flat.length - 1 ? 'Fin del recorrido' : 'Continuar';
   const hasCheck = !!screenEl.querySelector('[data-check]');
   $('reveal').disabled = !hasCheck || revealed.has(idx);
-  $('notes').innerHTML = `<h4>Notas del ponente</h4><p>Plan acumulado al terminar este módulo: ${planEnd[mi]} min.</p><p>${scr.notes || 'Sin notas para esta pantalla.'}</p>`;
+  $('notes').innerHTML = `<h4>Notas del ponente</h4><p>Plan acumulado al terminar este módulo: ${planEnd[mi]} min de 50.</p><p>${scr.notes || 'Sin notas para esta pantalla.'}</p>`;
   renderNav();
   history.replaceState(null, '', `#m${mi}-s${si+1}`);
   updateTimer();
@@ -1082,6 +1444,20 @@ function toggleTimer(){
   updateTimer();
 }
 
+/* Tema: oscuro por defecto (identidad del cartel); el claro se recuerda en este navegador */
+let theme = 'dark';
+try { theme = localStorage.getItem('charla-theme') === 'light' ? 'light' : 'dark'; } catch(e){}
+function applyTheme(){
+  if (theme === 'light') document.documentElement.dataset.theme = 'light';
+  else delete document.documentElement.dataset.theme;
+  $('themeBtn').textContent = theme === 'light' ? 'Modo oscuro' : 'Modo claro';
+}
+function toggleTheme(){
+  theme = theme === 'light' ? 'dark' : 'light';
+  applyTheme();
+  try { localStorage.setItem('charla-theme', theme); } catch(e){}
+}
+
 function togglePresent(){
   const on = document.body.classList.toggle('presenting');
   $('presentBtn').textContent = on ? 'Salir de presentación' : 'Presentar';
@@ -1099,6 +1475,7 @@ $('next').onclick = () => go(idx+1);
 $('reveal').onclick = reveal;
 $('timer').onclick = toggleTimer;
 $('notesBtn').onclick = () => $('notes').classList.toggle('open');
+$('themeBtn').onclick = toggleTheme;
 $('presentBtn').onclick = togglePresent;
 $('navList').onclick = e => {
   const b = e.target.closest('[data-mod]'); if (!b) return;
@@ -1115,11 +1492,13 @@ document.addEventListener('keydown', e => {
     case 'n': case 'N': $('notes').classList.toggle('open'); break;
     case 'p': case 'P': togglePresent(); break;
     case 't': case 'T': toggleTimer(); break;
+    case 'c': case 'C': toggleTheme(); break;
     case 'Escape': $('notes').classList.remove('open'); break;
   }
 });
 window.addEventListener('hashchange', () => { const i = parseHash(); if (i !== idx){ idx = i; render(); } });
 
+applyTheme();
 idx = parseHash();
 render(false);
 </script>
