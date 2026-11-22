@@ -241,9 +241,9 @@ services/adoption-service/
 
 | Módulo | Paquetes principales | Contenido en `adoption-service` |
 |---|---|---|
-| `domain` | `domain.model`, `domain.exception`, `domain.event`, `domain.port` | `Pet`, `PetId`, `Owner`, `PetStatus`; `PetNotAvailableException`, `PetNotFoundException`; `PetAdopted`; `LoadPetPort`, `SavePetPort`, `PublishPetAdoptedPort` |
+| `domain` | `domain.model`, `domain.exception`, `domain.event`, `domain.port` | `Pet`, `PetId`, `Owner` (records inmutables), `PetStatus`; `PetNotAvailableException`, `PetNotFoundException`; `PetAdopted`; `LoadPetPort`, `SavePetPort`, `PublishPetAdoptedPort` |
 | `application` | `application.port.in`, `application.service` | `AdoptPetUseCase`, `AdoptPetCommand`, `AdoptionResult`; `AdoptPetService` |
-| `infrastructure` | `infrastructure.mongodb`, `infrastructure.rabbitmq`, `infrastructure.inmemory`, `infrastructure.client` | `MongoPetAdapter`, `PetDocument`, `PetMongoMapper`, `SpringDataPetRepository`; `RabbitPetAdoptedPublisher`, `PetAdoptedMessage`, configuración de exchange; `InMemoryPetAdapter` |
+| `infrastructure` | `infrastructure.mongodb`, `infrastructure.rabbitmq`, `infrastructure.inmemory`, `infrastructure.client` | `MongoLoadPetAdapter`, `MongoSavePetAdapter`, `PetDocument`, `PetMongoMapper`, `SpringDataPetRepository`; `RabbitPetAdoptedPublisher`, `PetAdoptedMessage`, configuración de exchange; `InMemoryLoadPetAdapter`, `InMemorySavePetAdapter`, `InMemoryPetStore` |
 | `api-contract` | Generados desde `openapi/adoption-api.yaml` | Interfaz de la API y DTOs de petición y respuesta |
 | `api-rest` | `api.rest` | Controlador que implementa la interfaz generada, mapper DTO a comando, manejador de errores (`ProblemDetail`) |
 | `soap-contract` | Generados desde `adoption-types.xsd` | Clases JAXB de petición, respuesta y faults |
@@ -257,13 +257,13 @@ Nombres reales en el código (la presentación debe usar estos):
 | Pieza | Nombre |
 |---|---|
 | Puertos de salida | `LoadPetPort.loadPet(PetId)`, `SavePetPort.savePet(Pet)` y `PublishPetAdoptedPort.publish(PetAdopted)` |
-| Regla de adopción | `Pet.adopt(Owner, Instant)` devuelve el evento `PetAdopted`. Fábricas `Pet.available(...)` y `Pet.restore(...)`; `getOwner()` devuelve `Optional` |
+| Regla de adopción | `Pet` es un record inmutable: `Pet.adopt(Owner)` devuelve una mascota nueva, ya adoptada. Fábrica `Pet.available(...)`; el constructor canónico valida la invariante. El evento se crea con `PetAdopted.of(mascotaAdoptada, instante)` |
 | Comando | `AdoptPetCommand(PetId, Owner)`, con objetos valor |
 | Adaptador REST | `AdoptionController implements AdoptionApi` (generada), con `AdoptionRestMapper` y `RestExceptionHandler extends ResponseEntityExceptionHandler` |
 | Adaptador SOAP | `AdoptionEndpoint` con `AdoptionSoapMapper`. `AdoptionFaultResolver` traduce las excepciones de dominio a faults; el endpoint no captura excepciones |
 | Publicación del evento | `RabbitPetAdoptedPublisher`, con `PetAdoptedMessage` y `RabbitConfig` |
-| Persistencia en memoria | `InMemoryPetAdapter` guarda copias de las mascotas. El contrato común es `PetPersistenceContract`, en los tests de `infrastructure` |
-| ArchUnit | `ArchitectureTest`, con 8 reglas |
+| Persistencia en memoria | `InMemoryLoadPetAdapter` e `InMemorySavePetAdapter` comparten `InMemoryPetStore`, que guarda las mascotas sin copias porque son inmutables. El contrato común es `PetPersistenceContract`, en los tests de `infrastructure` |
+| ArchUnit | `ArchitectureTest`, con 9 reglas, entre ellas «cada adaptador implementa un único puerto» |
 
 `notification-service` (hexagonal):
 
@@ -281,7 +281,7 @@ Los adaptadores de entrada por mensajería (listeners de RabbitMQ) también vive
 ### Dependencias entre módulos (las impone Maven)
 
 ```text
-domain          ← sin dependencias (solo Lombok como provided)
+domain          ← sin dependencias (ni Spring ni Lombok)
 application     → domain
 infrastructure  → domain, application (y Spring Data MongoDB, Spring AMQP, clientes)
 api-contract    → solo lo necesario para el código generado
@@ -292,12 +292,12 @@ boot            → todos los anteriores; único módulo con spring-boot-maven-p
 ```
 
 - `api-rest` y `api-soap` **no dependen de `infrastructure`**, ni al revés.
-- Si alguien importa Spring o MongoDB en `domain` o en `application`, **el proyecto no compila**. Está comprobado: `package org.springframework.stereotype does not exist`. ArchUnit, en `boot`, comprueba además las reglas que Maven no puede ver (por ejemplo, que `domain.port` no use tipos de `infrastructure`). Usa el artefacto `archunit`, sin su motor, con `@Test` de JUnit 6, y permite `lombok..` por la anotación `@lombok.Generated`.
+- Si alguien importa Spring o MongoDB en `domain` o en `application`, **el proyecto no compila**. Está comprobado: `package org.springframework.stereotype does not exist`. ArchUnit, en `boot`, comprueba además las reglas que Maven no puede ver (por ejemplo, que `domain.port` no use tipos de `infrastructure`). Usa el artefacto `archunit`, sin su motor, con `@Test` de JUnit 6, y en `application` permite `lombok..` por la anotación `@lombok.Generated`. También comprueba que cada adaptador de `infrastructure` implemente un único puerto.
 - Solo `boot` produce el JAR ejecutable.
 
 ### Uso de Lombok
 
-- **Dominio:** se permite porque solo actúa en compilación, pero **nunca `@Data` ni `@Setter`** en entidades: los setters permitirían saltarse las invariantes. Sí `@Getter`, `@RequiredArgsConstructor`, `@EqualsAndHashCode` y `@ToString` cuando aporten. Los objetos valor, comandos y eventos se escriben como `record`.
+- **Dominio: sin Lombok.** El modelo de dominio son **records inmutables** (`Pet` incluido): los cambios devuelven un objeto nuevo, como `pet.adopt(owner)`. Así nadie se salta una regla con un setter, no hay objetos a medio cambiar, se comparten sin copias defensivas y los tests comparan valores. Las excepciones de dominio son clases normales sin Lombok. Comandos, resultados y eventos también son `record`.
 - **Adaptadores:** `@RequiredArgsConstructor` para inyección por constructor y `@Data` en documentos de MongoDB si se quiere.
 - **Rama `mvc`:** `@Data` en el documento usado como modelo de negocio. Es parte del material de malas prácticas.
 
@@ -308,6 +308,8 @@ boot            → todos los anteriores; único módulo con spring-boot-maven-p
 - Los puertos se nombran por capacidad, nunca por tecnología: `SavePetPort`, no `MongoPetRepositoryPort`.
 - Los puertos usan tipos de dominio, nunca DTOs generados, clases JAXB, documentos de MongoDB ni mensajes de RabbitMQ.
 - Los adaptadores solo traducen y no contienen reglas de negocio. Mappers, modelos técnicos, timeouts, reintentos y fallbacks viven en el adaptador.
+- **Un adaptador, un puerto:** cada adaptador implementa una única interfaz de puerto y hace una sola cosa (por ejemplo, `MongoLoadPetAdapter` y `MongoSavePetAdapter`). Si dos adaptadores necesitan compartir algo, como el almacén en memoria, se extrae a una clase técnica que no es un puerto (`InMemoryPetStore`). ArchUnit lo comprueba.
+- **El modelo de dominio es inmutable:** records, sin setters; los cambios de estado devuelven un objeto nuevo.
 - Las excepciones de dominio se traducen a HTTP solo en `api-rest` y a faults SOAP solo en `api-soap`.
 - El código generado (OpenAPI y JAXB) **nunca** se usa fuera de su módulo de API ni de su cliente en `infrastructure`.
 
@@ -419,7 +421,7 @@ Teclas: flechas o mando para navegar, S para ver la solución, N para las notas 
 - **Tres bloques visibles** en el menú lateral, en la cabecera y en el pie de cada pantalla. El objeto `BLOCKS` y el campo `block` de cada módulo los definen.
 - **Código en vivo marcado:** las pantallas con `live` muestran «Código en vivo · <etiqueta>», y sus notas indican la rama y la etiqueta de partida.
 - **`SRC` es el código real del repositorio:** extractos, con lo omitido indicado con `// ...`. Incluye `mvc` (00-start), las etiquetas 01 a 08 y `notification-service`.
-- **Comprobada sin errores en las 47 pantallas.** A 1920×1080 en modo presentación no desborda ninguna, ni en ancho ni en alto. A 1280×760, algunas piden scroll vertical. Las líneas de código largas se parten dentro del panel.
+- **Comprobada sin errores en las 48 pantallas.** A 1920×1080 en modo presentación no desborda ninguna, ni en ancho ni en alto. A 1280×760, algunas piden scroll vertical. Las líneas de código largas se parten dentro del panel.
 
 ### Estructura: 50 minutos en tres bloques
 
@@ -465,7 +467,8 @@ Guía del ponente. Usa la analogía del restaurante: recetas como dominio, jefe 
   - mensajería;
   - buenas y malas prácticas.
 - Preguntas difíciles nuevas:
-  - Lombok en el dominio;
+  - records en el dominio y por qué es inmutable;
+  - un adaptador por puerto;
   - puertos de salida en `domain`;
   - módulos frente a paquetes;
   - por qué SOAP;
