@@ -42,7 +42,7 @@ La construcción falla con un mensaje claro si no se usa Java 25.
   Después, reinicia la máquina. `compose.yaml` publica los puertos solo en `127.0.0.1`, porque en WSL las conexiones a `::1` se quedan colgadas.
 - Si al arrancar la máquina aparece `win-sshproxy.exe failed to start`, suele deberse a un socket huérfano en `%TEMP%\podman`: para la máquina, renombra esa carpeta y vuelve a arrancarla.
 - **`Unable to establish loopback connection` al arrancar un servicio.** Java crea un socket AF_UNIX interno en `%TEMP%`, y algunos equipos corporativos lo bloquean. Indica otra carpeta, que debe existir, añadiendo `-Djdk.net.unixdomain.tmpdir=C:\ruta\a\otra\carpeta` a la variable de entorno `JAVA_TOOL_OPTIONS`.
-- En redes corporativas con proxy TLS (por ejemplo, Zscaler), el certificado raíz corporativo debe instalarse **dentro** de la máquina de Podman, no solo en Windows.
+- En redes corporativas con un proxy TLS, el certificado raíz corporativo debe instalarse **dentro** de la máquina de Podman, no solo en Windows.
 
 ### Maven y mirrors corporativos
 
