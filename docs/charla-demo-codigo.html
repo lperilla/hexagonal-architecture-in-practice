@@ -1229,6 +1229,9 @@ git diff mvc hexagonal --stat -- services/adoption-service`})}`,
   { title:'Para llevarse', body:()=>`
     <p class="big-q">Hexagonal no hace el código más corto: hace que <b>lo que cambia</b> y <b>lo que no</b> estén separados.</p>
     ${keys(['Si la lógica de negocio importa y la aplicación va a vivir años, merece la pena.','Si es un CRUD o un prototipo, MVC en capas es la decisión correcta.','Se puede llegar de forma gradual: primero el dominio, luego los puertos y los adaptadores, con cada paso compilando.','Los contratos (OpenAPI y WSDL) y ArchUnit mantienen la arquitectura cuando el equipo cambia.'])}
+    ${tbl(['Rama','Ruta en GitHub'],[
+      ['<code class="i">mvc</code> (punto de partida)','<a href="https://github.com/lperilla/hexagonal-architecture-in-practice/tree/mvc">github.com/lperilla/hexagonal-architecture-in-practice/tree/mvc</a>'],
+      ['<code class="i">hexagonal</code> (transformación)','<a href="https://github.com/lperilla/hexagonal-architecture-in-practice/tree/hexagonal">github.com/lperilla/hexagonal-architecture-in-practice/tree/hexagonal</a>']])}
     ${code({file:'para repetirlo', lang:'bash', src:SRC.run})}`,
     notes:'Cerrar con la pregunta del principio ya respondida con código. Dejar el repositorio como referencia: ramas <code>mvc</code> y <code>hexagonal</code>, y las etiquetas de la migración.' }
 ]}
