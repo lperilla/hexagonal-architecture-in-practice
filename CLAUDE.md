@@ -421,7 +421,8 @@ Teclas: flechas o mando para navegar, S para ver la solución, N para las notas 
 - **Tres bloques visibles** en el menú lateral, en la cabecera y en el pie de cada pantalla. El objeto `BLOCKS` y el campo `block` de cada módulo los definen.
 - **Código en vivo marcado:** las pantallas con `live` muestran «Código en vivo · <etiqueta>», y sus notas indican la rama y la etiqueta de partida.
 - **`SRC` es el código real del repositorio:** extractos, con lo omitido indicado con `// ...`. Incluye `mvc` (00-start), las etiquetas 01 a 08 y `notification-service`.
-- **Comprobada sin errores en las 48 pantallas.** A 1920×1080 en modo presentación no desborda ninguna, ni en ancho ni en alto. A 1280×760, algunas piden scroll vertical. Las líneas de código largas se parten dentro del panel.
+- **Dudas y respuestas:** módulo de consulta con el componente `qa(pregunta, respuesta, ejemplo)`. Para añadir una pregunta, basta una llamada a `qa` en la pantalla que corresponda.
+- **Comprobada sin errores en las 54 pantallas** (48 de la charla y 6 del anexo; el anexo se comprobó con el DOM mínimo y en el navegador, el recorrido a 1920×1080 está por repetir). A 1920×1080 en modo presentación no desborda ninguna, ni en ancho ni en alto. A 1280×760, algunas piden scroll vertical. Las líneas de código largas se parten dentro del panel.
 
 ### Estructura: 50 minutos en tres bloques
 
@@ -438,6 +439,7 @@ Teclas: flechas o mando para navegar, S para ver la solución, N para las notas 
 | 3 · Ventajas y decisiones de diseño | 8. Ventajas: sustituir infraestructura, testing por capas, ventajas y costes | 4 | `08-testing` |
 | | 9. Decisiones: API first y contract first, decisiones de diseño, cuándo sí y cuándo no, DDD y SOLID (consulta) | 4 | |
 | Cierre | 10. Cinco reglas, la pregunta del principio y para seguir | 2 | |
+| Anexo · Dudas y respuestas | 11. Preguntas frecuentes para el turno de preguntas (6 pantallas): dominio, entidad y agregado; value objects e inmutabilidad; casos de uso y reglas; puertos, adaptadores y contratos; decisiones del día a día. **Fuera de los 50 minutos** (`min:0`) | 0 | |
 
 Las pantallas marcadas como **recortables** en las notas dicen cuánto tiempo ahorran. DDD y SOLID quedan como material de consulta.
 

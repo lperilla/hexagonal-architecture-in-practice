@@ -152,6 +152,12 @@ code.i{font-family:var(--mono); font-size:.88em; background:var(--surface-2); pa
 .mistake p{margin:0; font-size:.95rem}
 .mistake .fix{color:var(--good)}
 .mistake .fix b, .mistake .eff b{font-weight:600}
+.qa{padding:12px 0; border-top:1px solid var(--line)}
+.qa:first-child{border-top:0; padding-top:0}
+.qa h4{margin:0 0 4px; font-family:var(--serif); font-size:1.08rem; color:var(--adapter)}
+.qa p{margin:0 0 6px; font-size:.95rem}
+.qa p:last-child{margin-bottom:0}
+.qa .ex{font-size:.88rem; color:var(--muted)}
 
 .keys{list-style:none; padding:0; margin:0 0 18px}
 .keys li{padding:8px 0 8px 22px; position:relative; border-bottom:1px solid var(--line); max-width:72ch}
@@ -315,6 +321,8 @@ const good = (n, title, why, where) =>
 /** BeforeAfter */
 const beforeAfter = (before, after, tb='Antes', ta='Después') =>
   `<div class="ba"><div class="before"><p class="tag">${tb}</p>${code(before)}</div><div class="after"><p class="tag">${ta}</p>${code(after)}</div></div>`;
+/** Pregunta frecuente: pregunta, respuesta y, opcionalmente, ejemplo del repositorio */
+const qa = (q, a, ex) => `<article class="qa"><h4>${q}</h4><p>${a}</p>${ex ? `<p class="ex">${ex}</p>` : ''}</article>`;
 const keys = arr => `<ul class="keys">${arr.map(k=>`<li>${k}</li>`).join('')}</ul>`;
 const fig = (svg, cap) => `<figure class="figure">${svg}${cap?`<figcaption>${cap}</figcaption>`:''}</figure>`;
 /** Marca de código en vivo para las notas del ponente */
@@ -982,7 +990,7 @@ git diff mvc hexagonal --stat -- services/adoption-service`
    Guion: bloques, módulos y pantallas
    ========================================================= */
 const BLOCKS = ['Introducción', 'Bloque 1 · Puertos y adaptadores', 'Bloque 2 · Buenas y malas prácticas',
-  'Bloque 3 · Ventajas y decisiones de diseño', 'Cierre'];
+  'Bloque 3 · Ventajas y decisiones de diseño', 'Cierre', 'Anexo · Dudas y respuestas'];
 
 const MODULES = [
 /* ===================== Introducción ===================== */
@@ -1384,7 +1392,71 @@ El código depende de dentro.`})}
   { title:'Para seguir', body:()=>`
     <p class="rule">Hexagonal no consiste en dibujar un hexágono. Consiste en conservar las decisiones de negocio cuando cambian las decisiones tecnológicas.</p>
     <div class="grid2"><div>${code({file:'etiquetas del repositorio', lang:'text', src:SRC.tags})}</div><div>${code({file:'arranque', lang:'bash', src:SRC.run})}</div></div>`,
-    notes:'Abrir turno de preguntas (10 min).' }
+    notes:'Abrir turno de preguntas (10 min). Si la pregunta es una de las habituales, saltar al módulo 11 (Dudas y respuestas).' }
+]},
+
+/* ===================== Anexo: dudas y respuestas ===================== */
+{ block:5, title:'Dudas y respuestas', min:0, goal:'Material de consulta para el turno de preguntas. No cuenta en los 50 minutos.', screens:[
+  { title:'Dominio, entidad y agregado', body:()=>`
+    <div class="grid2"><div>
+      ${qa('¿Qué es el dominio?','El problema de negocio y sus reglas, con el lenguaje de los expertos: qué es una mascota, cuándo puede adoptarse y qué ocurre al hacerlo. No incluye cómo se guarda, cómo se expone ni cómo se envía.','En el código: el módulo <code class="i">domain</code>, sin Spring ni Lombok.')}
+      ${qa('¿Qué es una entidad?','Un objeto con identidad: dos mascotas con el mismo nombre siguen siendo distintas porque tienen distinto <code class="i">PetId</code>. Su estado cambia a lo largo del tiempo, su identidad no.','<code class="i">Pet</code>.')}
+    </div><div>
+      ${qa('¿Qué es un agregado y para qué sirve?','Un grupo de objetos que se tratan como una unidad de consistencia, con una raíz que es la única puerta de entrada. Sirve para proteger las invariantes: nadie modifica una pieza interna saltándose a la raíz, y se guarda y se carga completo.','<code class="i">Pet</code> es la raíz; <code class="i">PetId</code> y <code class="i">Owner</code> son sus objetos valor.')}
+      ${qa('¿Por qué un agregado lleva su propia lógica de negocio?','Porque es quien conoce sus invariantes. Si la regla vive en un servicio, cualquiera puede cambiar el estado sin pasar por ella y acaba duplicada en cada canal (modelo anémico). Con la regla dentro, es imposible crear una mascota adoptada sin dueño.','mvc: <code class="i">setStatus</code> en el servicio. hexagonal: <code class="i">Pet.adopt(owner)</code>.')}
+    </div></div>`,
+    notes:'Preguntas más habituales. Anclar cada respuesta en Pet. Si preguntan por modelo anémico, remitir al error 5 del bloque 2.' },
+  { title:'Value objects e inmutabilidad', body:()=>`
+    <div class="grid2"><div>
+      ${qa('¿Qué es un value object?','Un objeto sin identidad, definido solo por sus valores: dos <code class="i">Owner</code> con el mismo nombre son intercambiables. Valida sus datos al crearse y puede llevar comportamiento propio.','<code class="i">PetId</code>, <code class="i">Owner</code>, <code class="i">EmailAddress</code>.')}
+      ${qa('¿Por qué un value object debe ser inmutable?','Porque su valor es su identidad: si pudiera cambiar, dejaría de ser el mismo valor. Además se comparte sin copias, sirve de clave en mapas y conjuntos y, si se validó al crearse, sigue siendo válido siempre.')}
+    </div><div>
+      ${qa('¿Por qué las entidades de dominio deben ser inmutables?','Inmutable no significa que no cambie, sino que cada cambio devuelve una instancia nueva con la misma identidad. La regla queda en un único método y no hay setters para saltársela ni estados a medias.','<code class="i">pet.adopt(owner)</code> devuelve una mascota nueva, ya adoptada.')}
+      ${qa('¿Por qué los comandos son inmutables?','Un comando es la intención del usuario en un instante: «adoptar esta mascota con este dueño». Si se pudiera modificar por el camino, lo ejecutado no sería lo pedido. Además es un mensaje que se registra, se reintenta o se encola.','<code class="i">AdoptPetCommand(PetId, Owner)</code> es un <code class="i">record</code>.')}
+    </div></div>`,
+    notes:'La clave: inmutable no es "no cambia", es "cambiar produce otro objeto". Si preguntan por el rendimiento, remitir a la pantalla siguiente.' },
+  { title:'La importancia de lo inmutable', body:()=>`
+    ${tbl(['Sin inmutabilidad','Con inmutabilidad'],[
+      ['Cualquiera con una referencia puede llamar a un setter y saltarse la regla','El único camino es el método del modelo, que protege la invariante'],
+      ['Objetos a medio cambiar: la mascota con estado adoptada y sin dueño','Un objeto siempre es válido desde que se construye hasta que se descarta'],
+      ['Copias defensivas al compartir objetos entre capas o hilos','Se comparten sin copias y sin sincronización (el almacén en memoria guarda <code class="i">Pet</code> tal cual)'],
+      ['Los tests comprueban qué campos cambiaron y en qué orden','Los tests comparan valores: entra una mascota, sale otra'],
+      ['Efectos laterales difíciles de rastrear entre capas','Cada cambio es explícito: se ve dónde se crea el objeto nuevo']])}
+    <div class="grid2" style="margin-top:14px"><div>
+      ${qa('¿No es caro crear objetos nuevos todo el tiempo?','En un caso de uso son unos pocos objetos pequeños y de vida corta, que la JVM gestiona muy bien. El cuello de botella real es MongoDB o la red, no el record.')}
+    </div><div>
+      ${qa('¿Cómo se guarda entonces un objeto inmutable?','El adaptador lo traduce a su modelo técnico (<code class="i">PetDocument</code>, mutable si hace falta) con un mapper. El dominio no sabe que existe.')}
+    </div></div>`,
+    notes:'Cerrar con la idea: la inmutabilidad convierte una convención ("no toques esto") en una garantía del compilador.' },
+  { title:'Casos de uso y reglas', body:()=>`
+    <div class="grid2"><div>
+      ${qa('¿Por qué un caso de uso no debe usar otro caso de uso?','Cada caso de uso es una intención completa con su propia frontera: validación, autorización y transacción. Si uno llama a otro, esas fronteras se anidan y el flujo se vuelve oculto, con dependencias circulares que se descubren tarde y tests que arrastran media aplicación. Además, los adaptadores (REST, SOAP, mensajes) deben poder invocar cada caso de uso por separado.','Qué hacer: si es una regla compartida, va al dominio (agregado o servicio de dominio); si es coordinación común, a un componente de aplicación o a un puerto; si es una reacción, a un evento.')}
+    </div><div>
+      ${qa('¿Qué va en el caso de uso y qué en el dominio?','El dominio decide (¿puede adoptarse?); el caso de uso orquesta: carga la mascota, llama a <code class="i">pet.adopt(owner)</code>, la guarda y publica el evento. Si una línea es una regla de negocio y está en el caso de uso, probablemente es del modelo.','<code class="i">AdoptPetService</code> frente a <code class="i">Pet.adopt()</code>.')}
+      ${qa('¿Qué es un servicio de dominio?','Una regla que no pertenece a una sola entidad, por ejemplo la elegibilidad de un adoptante que depende de varios datos. Sigue siendo Java puro y sin estado, y se usa antes de crear un servicio de aplicación para ello.')}
+      ${qa('¿Qué es un evento de dominio?','Un hecho que ya ocurrió, con nombre en pasado: <code class="i">PetAdopted</code>. El núcleo lo crea y un puerto lo publica; quién reacciona (notificaciones, registro) no es asunto del caso de uso.')}
+    </div></div>`,
+    notes:'La primera pregunta es de las que más salen. Ejemplo corto: "AdoptPet llamando a NotifyAdoption" ya es acoplamiento; la respuesta es el evento pet.adopted, que es lo que hace notification-service.' },
+  { title:'Puertos, adaptadores y contratos', body:()=>`
+    <div class="grid2"><div>
+      ${qa('¿Qué diferencia hay entre puerto y adaptador?','El puerto es la interfaz que define el núcleo, en su lenguaje (<code class="i">SavePetPort</code>). El adaptador es la clase que la implementa con una tecnología concreta (<code class="i">MongoSavePetAdapter</code>).')}
+      ${qa('¿Dónde se valida?','El formato en el borde (OpenAPI, XSD): un nombre vacío no llega al núcleo. Las reglas de negocio, en el dominio: una mascota no disponible no se adopta venga por el canal que venga. Un mismo dato puede pasar por las dos comprobaciones y cada una responde a una pregunta distinta.')}
+    </div><div>
+      ${qa('¿Mapear entre DTO, dominio y documento no es duplicar código?','Es duplicación aparente: cada modelo cambia por razones distintas (contrato, regla, almacenamiento). Sin mappers, un cambio en el JSON de la API acabaría tocando las reglas.','Es el coste que se admite en la tabla de ventajas y costes.')}
+      ${qa('¿Por qué no compartir una librería de DTOs entre servicios?','Porque acopla los despliegues: cambiar una clase obliga a recompilar y desplegar a todos. Cada servicio genera sus propias clases a partir del contrato, que sí es la fuente de verdad.')}
+    </div></div>`,
+    notes:'Si la pregunta es sobre excepciones, recordar: el dominio lanza excepciones propias y solo api-rest y api-soap las traducen a HTTP y a faults.' },
+  { title:'Decisiones del día a día', body:()=>`
+    <div class="grid2"><div>
+      ${qa('¿Hexagonal necesita DDD, o al revés?','No. Hexagonal decide dónde está la frontera entre negocio y tecnología; DDD decide cómo modelar el negocio dentro. Se combinan bien, pero se pueden usar por separado.')}
+      ${qa('¿Cuándo creo un puerto nuevo?','Cuando el núcleo necesita algo del exterior (guardar, consultar, notificar) o una frontera puede cambiar. Si solo existe por costumbre, es ceremonia.')}
+      ${qa('¿Cómo pruebo cada capa?','Dominio y caso de uso, en Java puro y con dobles escritos a mano. Adaptadores, con tests de integración y un contrato común. De extremo a extremo, un único fichero que no conoce la implementación.')}
+    </div><div>
+      ${qa('¿Dónde van las transacciones?','La frontera transaccional es el caso de uso. Como la capa de aplicación no lleva anotaciones de Spring, se aplica desde fuera, en <code class="i">boot</code> (por ejemplo, con un decorador del caso de uso). Entre MongoDB y RabbitMQ no hay transacción compartida: de ahí el outbox, la idempotencia y los reintentos.')}
+      ${qa('¿Y la seguridad y los logs?','La autenticación es del canal: filtros de Spring en los adaptadores. La autorización de negocio («solo un adoptante apto») es una regla de dominio o de aplicación. Los logs técnicos van en los adaptadores.')}
+      ${qa('¿Cómo empiezo en un proyecto existente?','Como hicimos aquí, sin reescribir: primero el dominio, luego el puerto de entrada, después los de salida y los adaptadores. Cada paso compila y pasa los tests.','Etiquetas <code class="i">00-start</code> a <code class="i">09-final</code>.')}
+    </div></div>`,
+    notes:'Escoger según el público. Para un público de negocio, quedarse con las dos primeras; para uno técnico, con transacciones y migración gradual.' }
 ]}
 ];
 
@@ -1416,7 +1488,7 @@ function renderNav(){
     const header = m.block !== lastBlock ? `<li class="blk">${BLOCKS[m.block]}</li>` : '';
     lastBlock = m.block;
     return `${header}<li><button data-mod="${i}" data-state="${state}" ${state==='current'?'aria-current="step"':''} aria-label="${BLOCKS[m.block]}, módulo ${i}: ${m.title}, ${label}">
-      <span class="dot">${state==='done' ? '✓' : i}</span><span><span class="t">${m.title}</span><span class="m">${m.min} min, ${m.screens.length} pantallas</span></span></button></li>`;
+      <span class="dot">${state==='done' ? '✓' : i}</span><span><span class="t">${m.title}</span><span class="m">${m.min ? m.min + ' min' : 'turno de preguntas'}, ${m.screens.length} pantallas</span></span></button></li>`;
   }).join('');
 }
 
@@ -1424,7 +1496,7 @@ function render(animate=true){
   const {mi, si} = flat[idx];
   const mod = MODULES[mi], scr = mod.screens[si];
   screenEl.innerHTML = `
-    <div class="modhead"><b>${BLOCKS[mod.block]}</b><span>Módulo ${mi}</span><span>${mod.min} min</span><span>Pantalla ${si+1} de ${mod.screens.length}</span>${scr.live ? `<span class="live">Código en vivo · ${scr.live}</span>` : ''}</div>
+    <div class="modhead"><b>${BLOCKS[mod.block]}</b><span>Módulo ${mi}</span><span>${mod.min ? mod.min + ' min' : 'fuera del guion'}</span><span>Pantalla ${si+1} de ${mod.screens.length}</span>${scr.live ? `<span class="live">Código en vivo · ${scr.live}</span>` : ''}</div>
     <h2>${si===0 && mi!==0 ? mod.title : scr.title}</h2>
     ${si===0 && mi!==0 ? `<p class="goal">${mod.goal}</p><h3 style="margin-top:0">${scr.title}</h3>` : ''}
     ${scr.body()}`;
